@@ -1,0 +1,37 @@
+﻿docker-compose : time=
+"2026-03-09T00:12:34+0
+2:00" level=warning ms
+g="C:\\Users\\Konstant
+inosStrikos\\Desktop\\
+NetCompany Hackathon 2
+026\\docker-compose.ym
+l: the attribute `vers
+ion` is obsolete, it w
+ill be ignored, please
+ remove it to avoid po
+tential confusion"
+At line:1 char:1
++ docker-compose build
+ > build.log 2>&1
++ ~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~
+    + CategoryInfo    
+          : NotSpeci  
+  fied: (time="2026   
+ -03-0...tial conf    
+usion":String) []    ,
+ RemoteException
+    + FullyQualifiedE 
+   rrorId : NativeCo  
+  mmandError
+ 
+request returned 500 I
+nternal Server Error f
+or API route and versi
+on http://%2F%2F.%2Fpi
+pe%2FdockerDesktopLinu
+xEngine/_ping, check i
+f the server supports 
+the requested API vers
+ion
+

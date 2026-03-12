@@ -1,0 +1,52 @@
+services:
+  # ChromaDB Vector Database
+  chromadb:
+    image: chromadb/chroma:0.5.5
+    container_name: citizengov_chroma
+    ports:
+      - "8000:8000"
+    volumes:
+      - chroma_data:/chroma/chroma
+    networks:
+      - citizengov_network
+
+  # The Python app (Streamlit + processing backend)
+  app:
+    build: .
+    container_name: citizengov_app
+    ports:
+      - "8501:8501"
+    depends_on:
+      - chromadb
+    environment:
+      # Optional: Override in local .env or here
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY:-}
+      - LLM_MODEL=${LLM_MODEL:-}
+      - CHROMA_HOST=${CHROMA_HOST:-chromadb}
+      - CHROMA_PORT=${CHROMA_PORT:-8000}
+    networks:
+      - citizengov_network
+
+  # The API Backend for n8n Webhooks
+  python-backend:
+    build: .
+    container_name: citizengov_api
+    ports:
+      - "8001:8000" # Mapped to 8001 on your machine
+    depends_on:
+      - chromadb
+    command: uvicorn app.api:app --host 0.0.0.0 --port 8000
+    environment:
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY:-}
+      - LLM_MODEL=${LLM_MODEL:-}
+      - CHROMA_HOST=${CHROMA_HOST:-chromadb}
+      - CHROMA_PORT=${CHROMA_PORT:-8000}
+    networks:
+      - citizengov_network
+
+networks:
+  citizengov_network:
+    driver: bridge
+
+volumes:
+  chroma_data:

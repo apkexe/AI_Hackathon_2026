@@ -1,0 +1,92 @@
+[
+    {
+        "id": "1",
+        "contractor": "TechCorp Solutions A.E.",
+        "budget": 45000,
+        "date": "2025-10-15",
+        "description": "Contract awarded to TechCorp Solutions A.E. for annual server maintenance and cloud infrastructure support for the municipality's primary data center.",
+        "municipality": "Municipality of Athens",
+        "category": "IT Services"
+    },
+    {
+        "id": "2",
+        "contractor": "GreenBuild Constructions",
+        "budget": 1200000,
+        "date": "2025-09-01",
+        "description": "Major renovation of the central square, including paving, new lighting fixtures, and landscaping. Awarded to GreenBuild Constructions.",
+        "municipality": "Municipality of Thessaloniki",
+        "category": "Construction"
+    },
+    {
+        "id": "3",
+        "contractor": "EduTech Supplies",
+        "budget": 15000,
+        "date": "2025-11-05",
+        "description": "Procurement of 30 interactive whiteboards and projectors for local public schools.",
+        "municipality": "Municipality of Patras",
+        "category": "Equipment"
+    },
+    {
+        "id": "4",
+        "contractor": "Consulting Group Hellas",
+        "budget": 85000,
+        "date": "2025-08-20",
+        "description": "Consulting services for the digital transformation strategy of the municipal citizen service centers (KEP).",
+        "municipality": "Municipality of Heraklion",
+        "category": "Consulting"
+    },
+    {
+        "id": "5",
+        "contractor": "CleanCity Services",
+        "budget": 350000,
+        "date": "2026-01-10",
+        "description": "Annual contract for waste management and street cleaning services in the northern suburbs.",
+        "municipality": "Municipality of Marousi",
+        "category": "Maintenance"
+    },
+    {
+        "id": "6",
+        "contractor": "WebDesigners Ltd.",
+        "budget": 150000,
+        "date": "2026-02-15",
+        "description": "High budget allocated for a basic website update; awarded to a company registered only 3 days prior.",
+        "municipality": "Municipality of Volos",
+        "category": "IT Services"
+    },
+    {
+        "id": "7",
+        "contractor": "SecureNet",
+        "budget": 60000,
+        "date": "2025-12-01",
+        "description": "Cybersecurity audit and implementation of new firewall rules for the municipal intranet.",
+        "municipality": "Municipality of Ioannina",
+        "category": "IT Services"
+    },
+    {
+        "id": "8",
+        "contractor": "Alpha Vehicles",
+        "budget": 250000,
+        "date": "2025-07-15",
+        "description": "Purchase of 5 electric garbage trucks to upgrade the municipality's fleet.",
+        "municipality": "Municipality of Larisa",
+        "category": "Equipment"
+    },
+    {
+        "id": "9",
+        "contractor": "Local Print Shop",
+        "budget": 5000,
+        "date": "2026-01-20",
+        "description": "Printing of informational brochures and posters for the upcoming cultural festival.",
+        "municipality": "Municipality of Chania",
+        "category": "Supplies"
+    },
+    {
+        "id": "10",
+        "contractor": "MegaEvents",
+        "budget": 75000,
+        "date": "2025-10-01",
+        "description": "Organization and setup of the annual Christmas village, including stage, lighting, and security.",
+        "municipality": "Municipality of Rhodes",
+        "category": "Events"
+    }
+]
