@@ -1,92 +1,92 @@
 [
-    {
-        "id": "1",
-        "contractor": "TechCorp Solutions A.E.",
-        "budget": 45000,
-        "date": "2025-10-15",
-        "description": "Contract awarded to TechCorp Solutions A.E. for annual server maintenance and cloud infrastructure support for the municipality's primary data center.",
-        "municipality": "Municipality of Athens",
-        "category": "IT Services"
-    },
-    {
-        "id": "2",
-        "contractor": "GreenBuild Constructions",
-        "budget": 1200000,
-        "date": "2025-09-01",
-        "description": "Major renovation of the central square, including paving, new lighting fixtures, and landscaping. Awarded to GreenBuild Constructions.",
-        "municipality": "Municipality of Thessaloniki",
-        "category": "Construction"
-    },
-    {
-        "id": "3",
-        "contractor": "EduTech Supplies",
-        "budget": 15000,
-        "date": "2025-11-05",
-        "description": "Procurement of 30 interactive whiteboards and projectors for local public schools.",
-        "municipality": "Municipality of Patras",
-        "category": "Equipment"
-    },
-    {
-        "id": "4",
-        "contractor": "Consulting Group Hellas",
-        "budget": 85000,
-        "date": "2025-08-20",
-        "description": "Consulting services for the digital transformation strategy of the municipal citizen service centers (KEP).",
-        "municipality": "Municipality of Heraklion",
-        "category": "Consulting"
-    },
-    {
-        "id": "5",
-        "contractor": "CleanCity Services",
-        "budget": 350000,
-        "date": "2026-01-10",
-        "description": "Annual contract for waste management and street cleaning services in the northern suburbs.",
-        "municipality": "Municipality of Marousi",
-        "category": "Maintenance"
-    },
-    {
-        "id": "6",
-        "contractor": "WebDesigners Ltd.",
-        "budget": 150000,
-        "date": "2026-02-15",
-        "description": "High budget allocated for a basic website update; awarded to a company registered only 3 days prior.",
-        "municipality": "Municipality of Volos",
-        "category": "IT Services"
-    },
-    {
-        "id": "7",
-        "contractor": "SecureNet",
-        "budget": 60000,
-        "date": "2025-12-01",
-        "description": "Cybersecurity audit and implementation of new firewall rules for the municipal intranet.",
-        "municipality": "Municipality of Ioannina",
-        "category": "IT Services"
-    },
-    {
-        "id": "8",
-        "contractor": "Alpha Vehicles",
-        "budget": 250000,
-        "date": "2025-07-15",
-        "description": "Purchase of 5 electric garbage trucks to upgrade the municipality's fleet.",
-        "municipality": "Municipality of Larisa",
-        "category": "Equipment"
-    },
-    {
-        "id": "9",
-        "contractor": "Local Print Shop",
-        "budget": 5000,
-        "date": "2026-01-20",
-        "description": "Printing of informational brochures and posters for the upcoming cultural festival.",
-        "municipality": "Municipality of Chania",
-        "category": "Supplies"
-    },
-    {
-        "id": "10",
-        "contractor": "MegaEvents",
-        "budget": 75000,
-        "date": "2025-10-01",
-        "description": "Organization and setup of the annual Christmas village, including stage, lighting, and security.",
-        "municipality": "Municipality of Rhodes",
-        "category": "Events"
-    }
+  {
+    "id": "ΨΩΞΗ46ΜΤΛ6-ΝΔ3",
+    "contractor": "INTRASOFT INTERNATIONAL A.E.",
+    "budget": 248000,
+    "date": "2026-02-18",
+    "description": "Σύμβαση για την ανάπτυξη και συντήρηση πληροφοριακού συστήματος διαχείρισης ηλεκτρονικών εγγράφων του Υπουργείου Ψηφιακής Διακυβέρνησης.",
+    "municipality": "Υπουργείο Ψηφιακής Διακυβέρνησης",
+    "category": "IT Services"
+  },
+  {
+    "id": "6ΛΚΩ46ΜΔΨΟ-ΘΒΑ",
+    "contractor": "ΑΚΤΩΡ Α.Τ.Ε.",
+    "budget": 3450000,
+    "date": "2026-01-22",
+    "description": "Σύμβαση κατασκευής νέου κτηρίου στέγασης υπηρεσιών ασύλου στην περιοχή Αττικής. Περιλαμβάνει οικοδομικές εργασίες, ηλεκτρομηχανολογικές εγκαταστάσεις και διαμόρφωση περιβάλλοντος χώρου.",
+    "municipality": "Υπουργείο Μετανάστευσης και Ασύλου",
+    "category": "Construction"
+  },
+  {
+    "id": "9ΨΡΤ46ΜΚ6Π-ΛΧΔ",
+    "contractor": "DELOITTE ΕΛΛΑΣ Α.Ε.",
+    "budget": 186000,
+    "date": "2026-03-01",
+    "description": "Παροχή συμβουλευτικών υπηρεσιών για τον σχεδιασμό στρατηγικής ψηφιακού μετασχηματισμού στα Κέντρα Εξυπηρέτησης Πολιτών (ΚΕΠ).",
+    "municipality": "Υπουργείο Εσωτερικών",
+    "category": "Consulting"
+  },
+  {
+    "id": "Ω3ΒΓ46ΜΤΛ6-2ΗΞ",
+    "contractor": "OTE A.E.",
+    "budget": 520000,
+    "date": "2026-02-05",
+    "description": "Σύμβαση παροχής τηλεπικοινωνιακών υπηρεσιών και δικτυακής υποδομής για τις κεντρικές υπηρεσίες του Υπουργείου Οικονομικών.",
+    "municipality": "Υπουργείο Οικονομικών",
+    "category": "IT Services"
+  },
+  {
+    "id": "ΨΛ496-ΚΗΝ",
+    "contractor": "ΤΕΧΝΟΔΟΜΗ Α.Ε.",
+    "budget": 890000,
+    "date": "2025-12-10",
+    "description": "Εργασίες συντήρησης και αποκατάστασης στρατιωτικών εγκαταστάσεων στη Βόρεια Ελλάδα.",
+    "municipality": "Υπουργείο Εθνικής Άμυνας",
+    "category": "Maintenance"
+  },
+  {
+    "id": "7ΞΘΡ46ΝΚ3Λ-ΩΜΠ",
+    "contractor": "ΝΕΟΣΥΣΤΕΜ Ε.Π.Ε.",
+    "budget": 450000,
+    "date": "2026-02-28",
+    "description": "Αναβάθμιση ιστοσελίδας και δημιουργία ψηφιακής πλατφόρμας ενημέρωσης πολιτών. Εταιρεία ιδρύθηκε 5 ημέρες πριν την ανάθεση.",
+    "municipality": "Υπουργείο Ψηφιακής Διακυβέρνησης",
+    "category": "IT Services"
+  },
+  {
+    "id": "ΡΚΛ246ΜΔΨΟ-8ΓΔ",
+    "contractor": "COSMOTE A.E.",
+    "budget": 95000,
+    "date": "2026-01-15",
+    "description": "Προμήθεια εξοπλισμού πληροφορικής για τις αστυνομικές υπηρεσίες: 200 φορητοί υπολογιστές και περιφερειακά.",
+    "municipality": "Υπουργείο Προστασίας του Πολίτη",
+    "category": "Supplies"
+  },
+  {
+    "id": "ΩΝ3Φ46ΜΚΡΙ-ΛΞΤ",
+    "contractor": "ΚΤΙΡΙΑΚΕΣ ΥΠΟΔΟΜΕΣ Α.Ε.",
+    "budget": 2100000,
+    "date": "2025-11-20",
+    "description": "Ανακαίνιση και ενεργειακή αναβάθμιση σχολικών κτηρίων σε 15 δημοτικά σχολεία της Αττικής.",
+    "municipality": "Υπουργείο Παιδείας, Θρησκευμάτων και Αθλητισμού",
+    "category": "Construction"
+  },
+  {
+    "id": "ΘΩΞ546ΝΚ3Λ-ΡΗΒ",
+    "contractor": "ΜΕΤΡΟΝ Α.Ε.",
+    "budget": 42000,
+    "date": "2026-03-05",
+    "description": "Προμήθεια γραφικής ύλης και αναλωσίμων για τις υπηρεσίες του Υπουργείου Εσωτερικών.",
+    "municipality": "Υπουργείο Εσωτερικών",
+    "category": "Supplies"
+  },
+  {
+    "id": "ΨΡΤ846ΜΔΨΟ-ΚΞΩ",
+    "contractor": "Unknown",
+    "budget": 15800000,
+    "date": "2026-01-30",
+    "description": "Χορήγηση βεβαίωσης πολυετούς υποχρέωσης για υπηρεσίες φιλοξενίας και σίτισης αιτούντων άσυλο σε δομές φιλοξενίας ανά την επικράτεια.",
+    "municipality": "Υπουργείο Μετανάστευσης και Ασύλου",
+    "category": "Budget Commitments"
+  }
 ]

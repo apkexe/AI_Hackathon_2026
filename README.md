@@ -83,7 +83,7 @@ CitizenGov/
 |           |-- Watchdog_Map.py      #   Risk monitoring dashboard with conditional formatting
 |
 |-- data/
-|   |-- sample_contracts.json        # 10 mock contracts (English, includes fraud test case)
+|   |-- sample_contracts.json        # 10 sample Δ.1 contracts (Greek, 7 ministries, includes anomaly cases)
 |
 |-- scripts/
 |   |-- ingest.py                    # CLI: run full pipeline with mock data
@@ -108,16 +108,18 @@ CitizenGov integrates with the [Diavgeia OpenData API](https://diavgeia.gov.gr/a
 | Endpoint | Purpose |
 |---|---|
 | `GET /search/advanced.json` | Paginated search with Lucene-style query syntax |
+| `GET /luminapi/api/decisions/{ada}` | Full decision details including `documentText` (plain-text body) |
 | `GET /organizations/{uid}.json` | Resolve organization UID to human-readable label |
 
 ### Query Design
 
-The advanced search query targets **7 Greek Ministries** and specific **decision types**:
+The advanced search query targets **7 Greek Ministries** and decision type **Δ.1 (Σύμβαση / Contract)** — the only type that contains actual contractor names:
 
 ```
-organizationUid:["6","15","100054486","100054489","100054492","100056663","100081880"]
-AND decisionTypeUid:["Β.1.3","Β.2.1"]
+organizationUid:"{uid}" AND decisionTypeUid:"Δ.1"
 ```
+
+Each ministry is queried individually with equal limits to ensure balanced representation across all 7.
 
 | Organization UID | Label | English |
 |---|---|---|
@@ -129,10 +131,13 @@ AND decisionTypeUid:["Β.1.3","Β.2.1"]
 | `100056663` | Υπουργείο Μετανάστευσης και Ασύλου | Ministry of Migration and Asylum |
 | `100081880` | Υπουργείο Παιδείας, Θρησκευμάτων και Αθλητισμού | Ministry of Education |
 
-| Decision Type | Description |
-|---|---|
-| `Β.1.3` | ΑΝΑΛΗΨΗ ΥΠΟΧΡΕΩΣΗΣ — Budget commitment decisions |
-| `Β.2.1` | ΕΓΚΡΙΣΗ ΔΑΠΑΝΗΣ — Expenditure approval decisions |
+| Decision Type | Description | Has Contractor? |
+|---|---|---|
+| **`Δ.1`** | **ΣΥΜΒΑΣΗ — Contract awards** | **Yes** (`person[].name` + AFM) |
+| `Β.1.3` | ΑΝΑΛΗΨΗ ΥΠΟΧΡΕΩΣΗΣ — Budget commitments | No |
+| `Β.2.1` | ΕΓΚΡΙΣΗ ΔΑΠΑΝΗΣ — Expenditure approvals | No |
+
+We focus exclusively on **Δ.1** because it is the only decision type that includes the contractor's identity (company name and tax ID / ΑΦΜ). Types Β.1.3 and Β.2.1 are internal budget acts that never specify a contractor, making them unsuitable for procurement fraud analysis.
 
 ### Field Extraction from API Response
 
@@ -141,11 +146,13 @@ The Diavgeia API returns decisions with structured metadata. We extract:
 | Our Field | Diavgeia Source | Notes |
 |---|---|---|
 | `id` | `ada` | Unique decision identifier (Αριθμός Διαδικτυακής Ανάρτησης) |
-| `description` | `subject` | Decision subject line |
+| `description` | `subject` + `documentText` | Subject line; optionally enriched with full decision text via `/luminapi/api/decisions/{ada}` |
 | `date` | `issueDate` | Unix timestamp (ms from epoch) |
 | `municipality` (ministry) | `organizationId` → lookup | Numeric org ID mapped to label via `ORG_ID_TO_LABEL` dict |
-| `budget` | `extraFieldValues.amountWithTaxes` or `extraFieldValues.amountWithVAT.amount` | Budget with VAT; fallback to amount field |
-| `contractor` | `extraFieldValues.sponsorName` | Available on some decision types |
+| `budget` | `extraFieldValues.awardAmount.amount` | Contract award amount; fallback to `amountWithTaxes` / `amountWithVAT` |
+| `contractor` | `extraFieldValues.person[].name` | Company name from the `person` array (Δ.1 decisions); includes AFM (tax ID) |
+
+**Decision text enrichment:** When `--fetch-text` is used, the fetcher calls `/luminapi/api/decisions/{ada}` for each decision to retrieve the `documentText` field — the plain-text body of the actual decision document. This is appended to the description (first 500 chars) to provide richer context for the AI auditor and RAG search. This adds ~0.2s per decision due to the extra API call.
 
 **Organization ID resolution:** The API returns `organizationId` as a numeric string (e.g., `"6114"`), not a human-readable name. We maintain a static mapping (`ORG_ID_TO_LABEL`) from organization UIDs to Greek labels, derived from the `/organizations/{uid}` endpoint.
 
@@ -395,7 +402,7 @@ The dashboard opens at `http://localhost:8501`. Use the sidebar to navigate betw
 
 ### Option A: Mock data
 
-Loads 10 sample contracts from `data/sample_contracts.json`, including a deliberate fraud test case (Contract 6: a EUR 150,000 website update awarded to a 3-day-old company).
+Loads 10 sample contracts from `data/sample_contracts.json` — realistic Greek Δ.1 decisions from 7 ministries, including deliberate anomaly test cases (e.g., a €450K website contract awarded to a company founded 5 days prior, and a €15.8M multi-year obligation with no named contractor).
 
 ```powershell
 python scripts/ingest.py
@@ -403,11 +410,14 @@ python scripts/ingest.py
 
 ### Option B: Real Diavgeia data — bulk ingestion
 
-Fetches live contracts from the Diavgeia OpenData advanced search API (`/search/advanced.json`) with pagination and runs them through the full pipeline (rules + AI audit + ChromaDB). Duplicate contracts (same ADA across pages) are automatically deduplicated before storage.
+Fetches live **Δ.1 (contract) decisions** from the Diavgeia OpenData advanced search API with pagination and runs them through the full pipeline (rules + AI audit + ChromaDB). Only Δ.1 decisions are fetched because they are the only type that includes the contractor's identity.
 
 ```powershell
-# Fetch 10,000 real contracts, audit flagged ones with GPT-5.1, store in ChromaDB
-python scripts/fetch_diavgeia.py --limit 10000
+# Fetch 14,000 real contracts (2,000 per ministry), audit flagged ones, store in ChromaDB
+python scripts/fetch_diavgeia.py --limit 14000
+
+# Same, but also fetch the full decision text for richer RAG context (~0.2s extra per decision)
+python scripts/fetch_diavgeia.py --limit 14000 --fetch-text
 
 # Re-ingest from cache (skips re-fetching and re-auditing — instant)
 python scripts/fetch_diavgeia.py --from-cache
@@ -417,6 +427,7 @@ Smaller batches for testing:
 
 ```powershell
 python scripts/fetch_diavgeia.py --limit 50
+python scripts/fetch_diavgeia.py --limit 50 --fetch-text
 ```
 
 Or POST them to the running FastAPI backend (same as n8n would):
@@ -463,11 +474,11 @@ The FastAPI backend runs on port **8001** and exposes the following endpoints:
 ```json
 {
   "ada": "ΨΩΞΗ46ΜΤΛ6-ΝΔ3",
-  "subject": "Προμήθεια εξοπλισμού πληροφορικής",
-  "issue_date": "2026-03-10",
-  "contractor": "TechCorp A.E.",
-  "budget": 85000.0,
-  "municipality": "Municipality of Thessaloniki"
+  "subject": "Σύμβαση για την ανάπτυξη πληροφοριακού συστήματος διαχείρισης ηλεκτρονικών εγγράφων",
+  "issue_date": "2026-02-18",
+  "contractor": "INTRASOFT INTERNATIONAL A.E.",
+  "budget": 248000.0,
+  "municipality": "Υπουργείο Ψηφιακής Διακυβέρνησης"
 }
 ```
 

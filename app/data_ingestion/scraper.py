@@ -30,7 +30,7 @@ def fetch_contracts(use_mock_data: bool = True) -> List[Dict[str, Any]]:
     api_url = "https://diavgeia.gov.gr/opendata/search/advanced.json"
     query = (
         'organizationUid:["6","15","100054486","100054489","100054492","100056663","100081880"] '
-        'AND decisionTypeUid:["\u0392.1.3","\u0392.2.1"]'
+        'AND decisionTypeUid:"\u0394.1"'
     )
     logger.info(f"Fetching contracts from Diavgeia advanced search API...")
 
@@ -46,14 +46,29 @@ def fetch_contracts(use_mock_data: bool = True) -> List[Dict[str, Any]]:
         for doc in decisions:
             try:
                 extra = doc.get("extraFieldValues") or {}
-                budget = extra.get("amountWithTaxes", 0)
+
+                # Budget: Δ.1 uses awardAmount, Β types use amountWithTaxes/amountWithVAT
+                award = extra.get("awardAmount") or {}
+                budget = award.get("amount", 0) if isinstance(award, dict) else 0
+                if not budget:
+                    budget = extra.get("amountWithTaxes", 0)
                 if not budget:
                     vat_obj = extra.get("amountWithVAT") or {}
                     budget = vat_obj.get("amount", 0) if isinstance(vat_obj, dict) else 0
 
+                # Contractor: Δ.1 uses person[] array, Β types use sponsorName
+                contractor = "Unknown"
+                persons = extra.get("person") or []
+                if persons and isinstance(persons, list):
+                    names = [p.get("name", "") for p in persons if p.get("name")]
+                    if names:
+                        contractor = ", ".join(names)
+                if contractor == "Unknown":
+                    contractor = (extra.get("sponsorName") or "Unknown").replace("\n", " ")
+
                 contract = {
                     "id": doc.get("ada", ""),
-                    "contractor": (extra.get("sponsorName") or "Unknown").replace("\n", " "),
+                    "contractor": contractor,
                     "budget": float(budget or 0),
                     "date": doc.get("issueDate", ""),
                     "description": (doc.get("subject") or "").replace("\n", " "),
