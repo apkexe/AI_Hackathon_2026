@@ -7,7 +7,12 @@ Usage:
 """
 import argparse
 import logging
+import os
+import sys
 from typing import List, Dict, Any
+
+# Ensure project root is on path
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from app.data_ingestion.scraper import fetch_contracts
 from app.data_ingestion.embeddings import VectorStore
