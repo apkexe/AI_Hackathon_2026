@@ -169,7 +169,7 @@ cd "NetCompany Hackathon 2026"
 py -3.12-64 -m venv myvenv
 
 # Activate (every time)
-.\myvenv\Scripts\activate
+.\myvenv\Scripts\Activate.ps1
 ```
 
 ### 3. Install dependencies
