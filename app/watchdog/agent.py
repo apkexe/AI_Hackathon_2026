@@ -7,7 +7,11 @@ import logging
 from typing import List, Dict, Any
 import requests
 
-from app.config import OPENROUTER_API_KEY, OPENROUTER_BASE_URL, LLM_MODEL, LLM_TEMPERATURE, DEMO_MODE
+from app.config import (
+    OPENROUTER_API_KEY, OPENROUTER_BASE_URL, LLM_MODEL, LLM_TEMPERATURE, DEMO_MODE,
+    OPENAI_API_KEY, OPENAI_BASE_URL, OPENAI_MODEL, LLM_PROVIDER,
+    AZURE_OPENAI_API_KEY, AZURE_OPENAI_ENDPOINT, AZURE_OPENAI_DEPLOYMENT, AZURE_OPENAI_API_VERSION
+)
 from app.prompts.templates import build_watchdog_prompt, WATCHDOG_SYSTEM_PROMPT
 # Note: we import parser functions directly to avoid circular dependency
 import app.prompts.parser as parser
@@ -27,28 +31,58 @@ def call_llm(system_prompt: str, user_prompt: str) -> str:
   "risk_summary": "Simulated AI Audit: High budget allocated for a basic website update; awarded to a company registered only 3 days prior."
 }"""
 
-    headers = {
-        "Authorization": f"Bearer {OPENROUTER_API_KEY}",
-        "Content-Type": "application/json"
-    }
-    
+    # Determine which provider to use
+    use_azure = LLM_PROVIDER == "azure" and AZURE_OPENAI_API_KEY
+    use_openai = LLM_PROVIDER == "openai" and OPENAI_API_KEY
+
+    if use_azure:
+        # Azure OpenAI uses a different URL format and api-key header
+        url = (
+            f"{AZURE_OPENAI_ENDPOINT.rstrip('/')}/openai/deployments/"
+            f"{AZURE_OPENAI_DEPLOYMENT}/chat/completions"
+            f"?api-version={AZURE_OPENAI_API_VERSION}"
+        )
+        headers = {
+            "api-key": AZURE_OPENAI_API_KEY,
+            "Content-Type": "application/json"
+        }
+        provider_name = "Azure OpenAI"
+    elif use_openai:
+        url = f"{OPENAI_BASE_URL}/chat/completions"
+        headers = {
+            "Authorization": f"Bearer {OPENAI_API_KEY}",
+            "Content-Type": "application/json"
+        }
+        provider_name = "OpenAI"
+    else:
+        url = f"{OPENROUTER_BASE_URL}/chat/completions"
+        headers = {
+            "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+            "Content-Type": "application/json"
+        }
+        provider_name = "OpenRouter"
+
     payload = {
-        "model": LLM_MODEL,
-        "temperature": LLM_TEMPERATURE,
         "messages": [
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_prompt}
         ]
     }
-    
+
+    # Azure GPT-5.2 only supports default temperature; others can use custom
+    if not use_azure:
+        payload["model"] = OPENAI_MODEL if use_openai else LLM_MODEL
+        payload["temperature"] = LLM_TEMPERATURE
+
+    response = None
     try:
-        response = requests.post(f"{OPENROUTER_BASE_URL}/chat/completions", headers=headers, json=payload, timeout=30)
+        response = requests.post(url, headers=headers, json=payload, timeout=30)
         response.raise_for_status()
         result = response.json()
         return result["choices"][0]["message"]["content"]
     except Exception as e:
-        logger.error(f"OpenRouter API call failed: {e}")
-        if hasattr(response, "text"):
+        logger.error(f"{provider_name} API call failed: {e}")
+        if response is not None and hasattr(response, "text"):
             logger.error(f"Response details: {response.text}")
         raise e
 

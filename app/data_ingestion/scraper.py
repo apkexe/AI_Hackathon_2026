@@ -29,7 +29,7 @@ def fetch_contracts(use_mock_data: bool = True) -> List[Dict[str, Any]]:
     # Real Diavgeia advanced search – same query as the n8n workflow
     api_url = "https://diavgeia.gov.gr/opendata/search/advanced.json"
     query = (
-        'organizationUid:["6013","6114","6247","6","100054486","100054492","100081880"] '
+        'organizationUid:["6","15","100054486","100054489","100054492","100056663","100081880"] '
         'AND decisionTypeUid:["\u0392.1.3","\u0392.2.1"]'
     )
     logger.info(f"Fetching contracts from Diavgeia advanced search API...")
@@ -77,39 +77,46 @@ def _infer_category(description: str) -> str:
     if any(kw in desc for kw in [
         "software", "hardware", "server", "web", "it", "computer",
         "πληροφορικ", "λογισμικ", "ψηφιακ", "ηλεκτρονικ", "διαδικτ",
-        "υπολογιστ", "τεχνολογ", "πλατφόρμ"
+        "υπολογιστ", "τεχνολογ", "πλατφόρμ", "μηχανογρ"
     ]):
         return "IT Services"
     elif any(kw in desc for kw in [
         "construct", "build", "renovat", "road",
-        "κατασκευ", "οικοδομ", "ανακαίνισ", "έργο", "οδοποι",
-        "γέφυρα", "κτίριο", "κτηρι"
+        "κατασκευ", "οικοδομ", "ανακαίνισ", "οδοποι",
+        "γέφυρα", "κτίριο", "κτηρι", "ασφαλτ", "δρόμο"
     ]):
         return "Construction"
     elif any(kw in desc for kw in [
         "consult", "study", "audit", "advis",
         "σύμβουλ", "μελέτ", "υπηρεσί", "παροχή υπηρεσ",
-        "νομικ", "λογιστικ"
+        "νομικ", "λογιστικ", "δαπάν", "πίστωσ", "δέσμευσ",
+        "έγκρισ", "διάθεσ"
     ]):
         return "Consulting"
     elif any(kw in desc for kw in [
         "supply", "purchase", "procure", "equipment",
         "προμήθ", "εξοπλισμ", "αγορ", "προϊόν",
-        "ανταλλακτικ", "υλικ"
+        "ανταλλακτικ", "υλικ", "τρόφιμ", "καύσιμ", "φάρμακ"
     ]):
         return "Supplies"
     elif any(kw in desc for kw in [
         "maintenance", "clean", "waste", "repair",
         "συντήρ", "καθαρ", "απορριμμ", "επισκευ",
-        "αποκατάστασ"
+        "αποκατάστασ", "φωτισμ"
     ]):
         return "Maintenance"
     elif any(kw in desc for kw in [
         "event", "festival", "ceremony", "conference",
-        "εκδήλωσ", "φεστιβάλ", "συνέδρι", "γιορτ"
+        "εκδήλωσ", "φεστιβάλ", "συνέδρι", "γιορτ", "αγών",
+        "αθλητ", "σχολικ", "παιδεί", "εκπαίδ"
     ]):
-        return "Events"
-    return "Miscellaneous"
+        return "Education & Events"
+    elif any(kw in desc for kw in [
+        "ανάληψη", "υποχρέωσ", "αποφασ", "κράτησ",
+        "ανακλητικ", "πολυετ", "βεβαίωσ"
+    ]):
+        return "Budget Commitments"
+    return "Public Expenditure"
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)

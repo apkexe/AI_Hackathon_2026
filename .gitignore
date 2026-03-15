@@ -1,4 +1,9 @@
 # Virtual environment
 myvenv/
-.env
+.claude/
+*.env
 *.pdf
+thought.md
+*.log
+*.gitignore
+
