@@ -51,7 +51,9 @@ class VectorStore:
                 "budget": float(c.get("budget", 0)),
                 "date": c.get("date", ""),
                 "municipality": c.get("municipality", ""),
-                "category": c.get("category", "")
+                "category": c.get("category", ""),
+                "risk_level": c.get("risk_level", "Low"),
+                "risk_summary": c.get("risk_summary", "")
             })
             
             ids.append(str(c["id"]))

@@ -1,7 +1,7 @@
 import logging
 from fastapi import FastAPI, BackgroundTasks
 from pydantic import BaseModel
-from typing import Optional
+from typing import Optional, List
 
 from app.data_ingestion.embeddings import VectorStore
 from app.watchdog.rules import evaluate_rules
@@ -23,32 +23,42 @@ class DiavgeiaPayload(BaseModel):
 
 def process_and_ingest(data: dict):
     logger.info(f"Processing webhook for contract: {data.get('ada')}")
-    # Convert payload to our internal project schema
     contract = {
         "id": data.get("ada"),
-        "contractor": data.get("contractor"),
-        "budget": float(data.get("budget", 0.0) or 0.0),
+        "contractor": data.get("contractor") or "Unknown",
+        "budget": float(data.get("budget") or 0.0),
         "date": data.get("issue_date"),
         "description": data.get("subject", ""),
-        "municipality": data.get("municipality"),
+        "municipality": data.get("municipality") or "Unknown",
         "category": _infer_category(data.get("subject", ""))
     }
-    
+
     contracts = [contract]
-    
+
     try:
-        # 1. Run Rule Evaluation
         contracts = evaluate_rules(contracts)
-        
-        # 2. Run LLM Audit
         contracts = audit_contracts(contracts)
-        
-        # 3. Embed and Save to ChromaDB
         vs = VectorStore()
         vs.ingest_contracts(contracts)
-        logger.info(f"✅ Successfully ingested {contract['id']} into ChromaDB.")
+        logger.info(f"Successfully ingested {contract['id']} into ChromaDB.")
     except Exception as e:
-        logger.error(f"❌ Failed to ingest contract {contract['id']}: {e}")
+        logger.error(f"Failed to ingest contract {contract['id']}: {e}")
+
+@app.get("/api/health")
+async def health():
+    """Healthcheck endpoint for n8n and monitoring."""
+    return {"status": "ok"}
+
+@app.get("/api/contracts")
+async def list_contracts():
+    """List all contracts currently stored in ChromaDB."""
+    try:
+        vs = VectorStore()
+        contracts = vs.search_contracts("", n_results=100)
+        return {"contracts": contracts, "count": len(contracts)}
+    except Exception as e:
+        logger.error(f"Failed to list contracts: {e}")
+        return {"contracts": [], "count": 0, "error": str(e)}
 
 @app.post("/api/ingest")
 async def ingest_webhook(payload: DiavgeiaPayload, background_tasks: BackgroundTasks):
@@ -57,3 +67,12 @@ async def ingest_webhook(payload: DiavgeiaPayload, background_tasks: BackgroundT
     """
     background_tasks.add_task(process_and_ingest, payload.model_dump())
     return {"status": "success", "message": f"Contract {payload.ada} queued for processing"}
+
+@app.post("/api/ingest/batch")
+async def ingest_batch(payloads: List[DiavgeiaPayload], background_tasks: BackgroundTasks):
+    """
+    Receives multiple contracts at once and processes them in the background.
+    """
+    for p in payloads:
+        background_tasks.add_task(process_and_ingest, p.model_dump())
+    return {"status": "success", "message": f"{len(payloads)} contracts queued for processing"}

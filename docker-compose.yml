@@ -9,6 +9,12 @@ services:
       - chroma_data:/chroma/chroma
     networks:
       - citizengov_network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/v1/heartbeat')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   # The Python app (Streamlit + processing backend)
   app:
@@ -17,13 +23,13 @@ services:
     ports:
       - "8501:8501"
     depends_on:
-      - chromadb
+      chromadb:
+        condition: service_healthy
     environment:
-      # Optional: Override in local .env or here
       - OPENROUTER_API_KEY=${OPENROUTER_API_KEY:-}
       - LLM_MODEL=${LLM_MODEL:-}
-      - CHROMA_HOST=${CHROMA_HOST:-chromadb}
-      - CHROMA_PORT=${CHROMA_PORT:-8000}
+      - CHROMA_HOST=chromadb
+      - CHROMA_PORT=8000
     networks:
       - citizengov_network
 
@@ -32,15 +38,16 @@ services:
     build: .
     container_name: citizengov_api
     ports:
-      - "8001:8000" # Mapped to 8001 on your machine
+      - "8001:8000"
     depends_on:
-      - chromadb
+      chromadb:
+        condition: service_healthy
     command: uvicorn app.api:app --host 0.0.0.0 --port 8000
     environment:
       - OPENROUTER_API_KEY=${OPENROUTER_API_KEY:-}
       - LLM_MODEL=${LLM_MODEL:-}
-      - CHROMA_HOST=${CHROMA_HOST:-chromadb}
-      - CHROMA_PORT=${CHROMA_PORT:-8000}
+      - CHROMA_HOST=chromadb
+      - CHROMA_PORT=8000
     networks:
       - citizengov_network
 

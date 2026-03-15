@@ -26,34 +26,44 @@ def fetch_contracts(use_mock_data: bool = True) -> List[Dict[str, Any]]:
             logger.error(f"Failed to load mock data: {e}")
             return []
     
-    # Real-world API integration (example structure)
-    api_url = "https://diavgeia.gov.gr/opendata/search.json?q=decisionType:B.2.1&size=50"
-    logger.info(f"Fetching contracts from API: {api_url}")
-    
+    # Real Diavgeia advanced search – same query as the n8n workflow
+    api_url = "https://diavgeia.gov.gr/opendata/search/advanced.json"
+    query = (
+        'organizationUid:["6013","6114","6247","6","100054486","100054492","100081880"] '
+        'AND decisionTypeUid:["\u0392.1.3","\u0392.2.1"]'
+    )
+    logger.info(f"Fetching contracts from Diavgeia advanced search API...")
+
     try:
-        response = requests.get(api_url, timeout=10)
+        response = requests.get(api_url, params={"q": query, "size": 50, "sort": "recent"}, timeout=30)
         response.raise_for_status()
         data = response.json()
-        
-        # Transform Diavgeia specific schema to our internal schema
+
+        # The advanced endpoint returns "decisions", basic returns "decisionResultList"
+        decisions = data.get("decisions") or data.get("decisionResultList") or []
+
         contracts = []
-        for doc in data.get("decisionResultList", []):
+        for doc in decisions:
             try:
-                # This is a simplified transformation for demonstration
-                # Real Diavgeia API is much more complex
+                extra = doc.get("extraFieldValues") or {}
+                budget = extra.get("amountWithTaxes", 0)
+                if not budget:
+                    vat_obj = extra.get("amountWithVAT") or {}
+                    budget = vat_obj.get("amount", 0) if isinstance(vat_obj, dict) else 0
+
                 contract = {
-                    "id": doc.get("ada"),
-                    "contractor": doc.get("extraFieldValues", {}).get("sponsorName", "Unknown"),
-                    "budget": float(doc.get("extraFieldValues", {}).get("amountWithTaxes", 0)),
-                    "date": doc.get("issueDate"),
-                    "description": doc.get("subject"),
-                    "municipality": doc.get("organizationLabel"),
+                    "id": doc.get("ada", ""),
+                    "contractor": (extra.get("sponsorName") or "Unknown").replace("\n", " "),
+                    "budget": float(budget or 0),
+                    "date": doc.get("issueDate", ""),
+                    "description": (doc.get("subject") or "").replace("\n", " "),
+                    "municipality": (doc.get("organizationLabel") or "Unknown").replace("\n", " "),
                     "category": _infer_category(doc.get("subject", ""))
                 }
                 contracts.append(contract)
             except Exception as e:
                 logger.warning(f"Failed to parse document {doc.get('ada')}: {e}")
-                
+
         return contracts
     except requests.exceptions.RequestException as e:
         logger.error(f"API request failed: {e}")
@@ -62,14 +72,43 @@ def fetch_contracts(use_mock_data: bool = True) -> List[Dict[str, Any]]:
 
 
 def _infer_category(description: str) -> str:
-    """Basic rule-based categorization as a fallback."""
+    """Rule-based categorization supporting both English and Greek keywords."""
     desc = description.lower()
-    if any(kw in desc for kw in ["software", "hardware", "server", "web", "it", "computer"]):
+    if any(kw in desc for kw in [
+        "software", "hardware", "server", "web", "it", "computer",
+        "πληροφορικ", "λογισμικ", "ψηφιακ", "ηλεκτρονικ", "διαδικτ",
+        "υπολογιστ", "τεχνολογ", "πλατφόρμ"
+    ]):
         return "IT Services"
-    elif any(kw in desc for kw in ["construct", "build", "renovat", "road"]):
+    elif any(kw in desc for kw in [
+        "construct", "build", "renovat", "road",
+        "κατασκευ", "οικοδομ", "ανακαίνισ", "έργο", "οδοποι",
+        "γέφυρα", "κτίριο", "κτηρι"
+    ]):
         return "Construction"
-    elif any(kw in desc for kw in ["consult", "study", "audit", "advis"]):
+    elif any(kw in desc for kw in [
+        "consult", "study", "audit", "advis",
+        "σύμβουλ", "μελέτ", "υπηρεσί", "παροχή υπηρεσ",
+        "νομικ", "λογιστικ"
+    ]):
         return "Consulting"
+    elif any(kw in desc for kw in [
+        "supply", "purchase", "procure", "equipment",
+        "προμήθ", "εξοπλισμ", "αγορ", "προϊόν",
+        "ανταλλακτικ", "υλικ"
+    ]):
+        return "Supplies"
+    elif any(kw in desc for kw in [
+        "maintenance", "clean", "waste", "repair",
+        "συντήρ", "καθαρ", "απορριμμ", "επισκευ",
+        "αποκατάστασ"
+    ]):
+        return "Maintenance"
+    elif any(kw in desc for kw in [
+        "event", "festival", "ceremony", "conference",
+        "εκδήλωσ", "φεστιβάλ", "συνέδρι", "γιορτ"
+    ]):
+        return "Events"
     return "Miscellaneous"
 
 if __name__ == "__main__":

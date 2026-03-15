@@ -1,0 +1,148 @@
+{
+  "nodes": [
+    {
+      "parameters": {
+        "url": "https://diavgeia.gov.gr/opendata/search/advanced.json",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "q",
+              "value": "organizationUid:[\"6013\", \"6114\", \"6247\", \"6\", \"100054486\", \"100054492\", \"100081880\"] AND decisionTypeUid:[\"Β.1.3\", \"Β.2.1\"]"
+            },
+            {
+              "name": "size",
+              "value": "50"
+            },
+            {
+              "name": "sort",
+              "value": "recent"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "Fetch Selected Contracts",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        64,
+        112
+      ],
+      "id": "2b1a6d61-0757-4cbf-9e70-c2e15d04eab3"
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "decisions",
+        "options": {}
+      },
+      "name": "Isolate Individual Contracts",
+      "type": "n8n-nodes-base.itemLists",
+      "typeVersion": 3,
+      "position": [
+        288,
+        112
+      ],
+      "id": "cb1f260d-343b-4e71-89e4-62606f6323d2"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://localhost:8001/api/ingest",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"ada\": \"{{ $json.ada }}\",\n  \"subject\": \"{{ $json.subject.replace(/\\n/g, ' ').replace(/\"/g, '\\\\\"') }}\",\n  \"issue_date\": \"{{ $json.issueDate }}\",\n  \"contractor\": \"{{ ($json.extraFieldValues.sponsorName || 'Unknown').replace(/\\n/g, ' ').replace(/\"/g, '\\\\\"') }}\",\n  \"budget\": {{ $json.extraFieldValues.amountWithTaxes || $json.extraFieldValues.amountWithVAT?.amount || 0 }},\n  \"municipality\": \"{{ ($json.organizationLabel || 'Unknown').replace(/\\n/g, ' ').replace(/\"/g, '\\\\\"') }}\"\n}",
+        "options": {}
+      },
+      "name": "POST to CitizenGov Backend",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        512,
+        112
+      ],
+      "id": "8d3e7944-adde-4b3b-b0f5-b6f8caa015ff"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        -160,
+        176
+      ],
+      "id": "03a56417-3a8d-4622-9024-100d8c04af47",
+      "name": "When clicking ‘Execute workflow’"
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes"
+            }
+          ]
+        }
+      },
+      "name": "Polling Trigger (5m)",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        -160,
+        -16
+      ],
+      "id": "ef37bd15-cd00-47ff-ab9d-12a95fd479ed",
+      "disabled": true
+    }
+  ],
+  "connections": {
+    "Fetch Selected Contracts": {
+      "main": [
+        [
+          {
+            "node": "Isolate Individual Contracts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Isolate Individual Contracts": {
+      "main": [
+        [
+          {
+            "node": "POST to CitizenGov Backend",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When clicking ‘Execute workflow’": {
+      "main": [
+        [
+          {
+            "node": "Fetch Selected Contracts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Polling Trigger (5m)": {
+      "main": [
+        [
+          {
+            "node": "Fetch Selected Contracts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "meta": {
+    "instanceId": "438f426f8709059e5a146b6dd7cc1a9cff45f495e93dd3e63646a50a1432d40e"
+  }
+}
