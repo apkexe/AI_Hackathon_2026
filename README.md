@@ -9,17 +9,16 @@ Built for **Netcompany Hackathon Thessaloniki 2026** — Challenge 2: AI-Powered
 ## Table of Contents
 
 1. [Architecture Overview](#architecture-overview)
-2. [Project Structure](#project-structure)
-3. [Diavgeia API Integration](#diavgeia-api-integration)
-4. [How the Pipeline Works](#how-the-pipeline-works)
-5. [RAG Architecture](#rag-architecture)
-6. [Prerequisites](#prerequisites)
-7. [Setup Guide](#setup-guide)
-8. [Running the Application](#running-the-application)
-9. [Data Ingestion](#data-ingestion)
-10. [API Reference](#api-reference)
-11. [Configuration](#configuration)
-12. [Design Decisions](#design-decisions)
+2. [Diavgeia API Integration](#diavgeia-api-integration)
+3. [How the Pipeline Works](#how-the-pipeline-works)
+4. [RAG Architecture](#rag-architecture)
+5. [Prerequisites](#prerequisites)
+6. [Setup Guide](#setup-guide)
+7. [Running the Application](#running-the-application)
+8. [Data Ingestion](#data-ingestion)
+9. [API Reference](#api-reference)
+10. [Configuration](#configuration)
+11. [Design Decisions](#design-decisions)
 
 ---
 
@@ -53,51 +52,6 @@ CitizenGov follows a four-stage pipeline architecture:
 
 ---
 
-## Project Structure
-
-```
-CitizenGov/
-|
-|-- app/                              # Main application package
-|   |-- config.py                     # Centralized configuration (env vars, defaults)
-|   |-- api.py                        # FastAPI backend (webhook receiver for n8n)
-|   |
-|   |-- data_ingestion/              # Module A: Data Collection & Storage
-|   |   |-- scraper.py               #   Task 1: Diavgeia API client + mock data loader
-|   |   |-- embeddings.py            #   Task 2: Embeddings + ChromaDB + hybrid search + re-ranking
-|   |
-|   |-- watchdog/                    # Module B: Anomaly Detection
-|   |   |-- rules.py                 #   Task 1: Rule-based budget threshold engine
-|   |   |-- agent.py                 #   Tasks 2-3: LLM auditing via OpenAI/OpenRouter + output mapping
-|   |
-|   |-- rag/                         # RAG Pipeline Components
-|   |   |-- query_analyzer.py        #   Query analysis: extracts structured filters from natural language
-|   |
-|   |-- prompts/                     # Module C: Prompt Engineering
-|   |   |-- templates.py             #   Few-shot prompts (watchdog), RAG prompt, context formatter
-|   |   |-- parser.py                #   Pydantic JSON parser with retry logic
-|   |
-|   |-- dashboard/                   # Streamlit Frontend
-|       |-- Home.py                  #   Main page: Hybrid RAG chat with dynamic charts
-|       |-- pages/
-|           |-- Watchdog_Map.py      #   Risk monitoring dashboard with conditional formatting
-|
-|-- data/
-|   |-- sample_contracts.json        # 10 sample Δ.1 contracts (Greek, 7 ministries, includes anomaly cases)
-|
-|-- scripts/
-|   |-- ingest.py                    # CLI: run full pipeline with mock data
-|   |-- fetch_diavgeia.py            # CLI: paginated Diavgeia fetcher (replaces n8n for bulk ingestion)
-|
-|-- n8n_flow_CitizenGov.json         # n8n workflow definition (Diavgeia -> FastAPI)
-|-- docker-compose.yml               # Docker services (ChromaDB, app, API)
-|-- Dockerfile                       # Python 3.10 image for containerized deployment
-|-- requirements.txt                 # Pinned Python dependencies
-|-- .env.example                     # Template environment variables
-|-- .env                             # Your actual environment variables (git-ignored)
-```
-
----
 
 ## Diavgeia API Integration
 
