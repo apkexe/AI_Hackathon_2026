@@ -508,6 +508,39 @@ All configuration is centralized in `app/config.py`, which reads from environmen
 
 ---
 
+## RAG Evaluation
+
+The `eval/` directory contains an automated evaluation framework that measures the quality of the RAG pipeline's answers against reference answers.
+
+### Files
+
+| File | Description |
+|---|---|
+| `eval/questions.csv` | 15 evaluation questions (Greek) with expected answers — covering both quantitative queries (specific contract lookups, risk counts per ministry) and qualitative queries (transparency recommendations, risk pattern analysis) |
+| `eval/evaluate_rag.py` | Evaluation script that runs each question through the full RAG pipeline, then uses GPT-5.1 as an impartial judge to score the answer (1–5) against the reference |
+| `eval/results.csv` | Output: actual RAG answers, scores, and per-question reasoning |
+
+### Running the evaluation
+
+```powershell
+python eval/evaluate_rag.py
+```
+
+### Results (3,284 contracts dataset)
+
+| Metric | Value |
+|---|---|
+| **Average Score** | **3.67 / 5** |
+| Score 5 (Perfect) | 6 questions |
+| Score 4 (Good) | 3 questions |
+| Score 3 (Acceptable) | 3 questions |
+| Score 2 (Poor) | 1 question |
+| Score 1 (Fail) | 2 questions |
+
+Filtered queries (e.g., "high-risk contracts of Ministry X") consistently score 4–5. Weaker scores come from questions requiring aggregation across the full dataset — the RAG window retrieves 50 contracts and re-ranks to 15, so questions about totals or frequencies across all 3,284 contracts may receive incomplete answers.
+
+---
+
 ## Design Decisions
 
 ### Why Hybrid RAG over naive semantic search?
