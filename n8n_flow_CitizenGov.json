@@ -8,7 +8,7 @@
           "parameters": [
             {
               "name": "q",
-              "value": "organizationUid:[\"6013\", \"6114\", \"6247\", \"6\", \"100054486\", \"100054492\", \"100081880\"] AND decisionTypeUid:[\"Β.1.3\", \"Β.2.1\"]"
+              "value": "organizationUid:[\"6\", \"15\", \"100054486\", \"100054489\", \"100054492\", \"100056663\", \"100081880\"] AND decisionTypeUid:[\"Δ.1\"]"
             },
             {
               "name": "size",
@@ -51,7 +51,7 @@
         "url": "http://localhost:8001/api/ingest",
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\n  \"ada\": \"{{ $json.ada }}\",\n  \"subject\": \"{{ $json.subject.replace(/\\n/g, ' ').replace(/\"/g, '\\\\\"') }}\",\n  \"issue_date\": \"{{ $json.issueDate }}\",\n  \"contractor\": \"{{ ($json.extraFieldValues.sponsorName || 'Unknown').replace(/\\n/g, ' ').replace(/\"/g, '\\\\\"') }}\",\n  \"budget\": {{ $json.extraFieldValues.amountWithTaxes || $json.extraFieldValues.amountWithVAT?.amount || 0 }},\n  \"municipality\": \"{{ ($json.organizationLabel || 'Unknown').replace(/\\n/g, ' ').replace(/\"/g, '\\\\\"') }}\"\n}",
+        "jsonBody": "={\n  \"ada\": \"{{ $json.ada }}\",\n  \"subject\": \"{{ $json.subject.replace(/\\n/g, ' ').replace(/\"/g, '\\\\\"') }}\",\n  \"issue_date\": \"{{ $json.issueDate }}\",\n  \"contractor\": \"{{ ($json.extraFieldValues.person?.[0]?.name || $json.extraFieldValues.sponsorName || 'Unknown').replace(/\\n/g, ' ').replace(/\"/g, '\\\\\"') }}\",\n  \"budget\": {{ $json.extraFieldValues.awardAmount?.amount || $json.extraFieldValues.amountWithTaxes || 0 }},\n  \"organization\": \"{{ ($json.organizationLabel || 'Unknown').replace(/\\n/g, ' ').replace(/\"/g, '\\\\\"') }}\"\n}",
         "options": {}
       },
       "name": "POST to CitizenGov Backend",

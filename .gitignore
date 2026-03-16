@@ -6,4 +6,5 @@ myvenv/
 thought.md
 *.log
 *.gitignore
+*.dockerignore
 

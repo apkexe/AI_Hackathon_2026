@@ -2,6 +2,7 @@
 Module C, Task 1: Few-Shot Prompt Templates
 Rigid templates to enforce flawless JSON output from low-temperature LLMs.
 """
+from datetime import datetime, timezone
 
 # The constraint: minimal temperature requires rigorous few-shot prompting
 WATCHDOG_SYSTEM_PROMPT = """
@@ -48,17 +49,34 @@ If you don't know the answer based on the context, say so. Do not hallucinate da
 """
 
 RAG_SYSTEM_PROMPT = """
-You are CitizenGov, an expert AI assistant for analyzing Greek public procurement contracts.
+Είσαι ο CitizenGov, εξειδικευμένος βοηθός ΤΝ για την ανάλυση δημοσίων προμηθειών.
+Παρακολουθείς αποφάσεις τύπου Δ.1 (Συμβάσεις) από 7 Ελληνικά Υπουργεία μέσω Διαύγειας.
 
-RULES:
-1. Answer ONLY based on the contract data provided in the context below. Never invent data.
-2. When making a claim about a specific contract, always reference its Contract ID.
-3. Format all budget figures with the Euro sign and thousand separators (e.g., €1,250,000).
-4. If the provided data does not contain enough information to fully answer the question, explicitly state what is missing.
-5. Be concise but thorough: use bullet points or short paragraphs, not lengthy essays.
-6. When comparing contracts, use tables if helpful.
-7. If asked about risk or fraud, highlight the risk level and summarize the risk reasons.
+ΚΑΝΟΝΕΣ:
+1. Απάντησε ΜΟΝΟ στα Ελληνικά, βασισμένος αποκλειστικά στα δεδομένα του πίνακα παρακάτω. Μην επινοείς δεδομένα.
+2. Όταν αναφέρεσαι σε συγκεκριμένη σύμβαση, χρησιμοποίησε πάντα το Contract ID (ΑΔΑ).
+3. Μορφοποίησε τα ποσά με σύμβολο € και διαχωριστικά χιλιάδων (π.χ. €1.250.000).
+4. Αν τα δεδομένα δεν επαρκούν, δήλωσε ρητά τι λείπει - μην υποθέτεις.
+5. Γίνε συνοπτικός: χρησιμοποίησε κουκίδες ή σύντομες παραγράφους.
+6. Όταν ρωτούν για κίνδυνο/ρίσκο, δώσε το επίπεδο κινδύνου (Risk) και περίληψη αιτιολόγησης.
+7. Αν στον πίνακα υπάρχουν συμβάσεις που ταιριάζουν στο ερώτημα, ΠΑΝΤΑ ανέφερέ τες. Μην πεις «δεν υπάρχουν» αν ο πίνακας περιέχει σχετικά δεδομένα.
+8. Τα δεδομένα που βλέπεις είναι ένα υποσύνολο - μπορεί να υπάρχουν περισσότερα στη βάση.
 """
+
+
+def _format_date(date_value) -> str:
+    """Convert various date formats to human-readable string."""
+    if not date_value:
+        return ""
+    # Unix timestamp in milliseconds
+    if isinstance(date_value, (int, float)) and date_value > 1_000_000_000:
+        try:
+            # If in milliseconds (> 10 digits), convert to seconds
+            ts = date_value / 1000 if date_value > 1_000_000_000_000 else date_value
+            return datetime.fromtimestamp(ts, tz=timezone.utc).strftime("%Y-%m-%d")
+        except (ValueError, OSError):
+            return str(date_value)
+    return str(date_value)
 
 
 def format_contracts_as_context(contracts):
@@ -70,29 +88,32 @@ def format_contracts_as_context(contracts):
         return "No contracts found."
 
     lines = [
-        "| ID | Contractor | Budget | Risk | Ministry | Description |",
-        "|---|---|---|---|---|---|",
+        "| ID | Ανάδοχος | Ποσό | Risk | Φορέας | Ημερομηνία | Περιγραφή |",
+        "|---|---|---|---|---|---|---|",
     ]
     for c in contracts:
         budget = c.get("budget", 0)
         try:
-            budget_str = f"\u20ac{float(budget):,.0f}"
+            budget_str = f"€{float(budget):,.0f}"
         except (ValueError, TypeError):
             budget_str = str(budget)
 
         desc = str(c.get("description", ""))
-        # Truncate long descriptions for token efficiency
-        if len(desc) > 120:
-            desc = desc[:117] + "..."
+        # Allow more text for Greek descriptions which carry critical detail
+        if len(desc) > 300:
+            desc = desc[:297] + "..."
         # Escape pipe characters in all fields
         desc = desc.replace("|", "/")
+
+        date_str = _format_date(c.get("date", ""))
 
         lines.append(
             f"| {c.get('id', '')} "
             f"| {c.get('contractor', '').replace('|', '/')} "
             f"| {budget_str} "
             f"| {c.get('risk_level', '')} "
-            f"| {c.get('municipality', '').replace('|', '/')} "
+            f"| {c.get('organization', '').replace('|', '/')} "
+            f"| {date_str} "
             f"| {desc} |"
         )
 

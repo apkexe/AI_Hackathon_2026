@@ -27,14 +27,8 @@ OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
 OPENAI_BASE_URL = "https://api.openai.com/v1"
 OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-5.1")
 
-# ── Azure OpenAI ───────────────────────────────────────────────────────
-AZURE_OPENAI_API_KEY = os.getenv("AZURE_OPENAI_API_KEY", "")
-AZURE_OPENAI_ENDPOINT = os.getenv("AZURE_OPENAI_ENDPOINT", "") 
-AZURE_OPENAI_DEPLOYMENT = os.getenv("AZURE_OPENAI_DEPLOYMENT", "")
-AZURE_OPENAI_API_VERSION = os.getenv("AZURE_OPENAI_API_VERSION", "2024-12-01-preview")
-
 # ── Provider selection ──────────────────────────────────────────────────
-LLM_PROVIDER = os.getenv("LLM_PROVIDER", "azure")  # "azure", "openai", or "openrouter"
+LLM_PROVIDER = os.getenv("LLM_PROVIDER", "openai")  # "openai" or "openrouter"
 
 # ── Embeddings ───────────────────────────────────────────────────────────
 EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "all-MiniLM-L6-v2")
@@ -50,4 +44,4 @@ CHROMA_COLLECTION = os.getenv("CHROMA_COLLECTION", "procurement_contracts")
 ANOMALY_MULTIPLIER = float(os.getenv("ANOMALY_MULTIPLIER", "3.0"))  # 300%
 
 # ── Demo mode flag ───────────────────────────────────────────────────────
-DEMO_MODE = not bool(OPENROUTER_API_KEY) and not bool(OPENAI_API_KEY) and not bool(AZURE_OPENAI_API_KEY)
+DEMO_MODE = not bool(OPENROUTER_API_KEY) and not bool(OPENAI_API_KEY)

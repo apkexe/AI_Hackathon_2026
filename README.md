@@ -1,6 +1,6 @@
 # CitizenGov - AI-Powered Public Procurement Watchdog
 
-CitizenGov is an AI-powered transparency platform that monitors Greek public sector contracts for signs of fraud, waste, and financial irregularities. It ingests procurement data from [Diavgeia](https://diavgeia.gov.gr/), runs automated anomaly detection, performs AI-driven auditing via GPT-5.1, and presents the results through an interactive Streamlit dashboard with a Hybrid RAG chat interface.
+CitizenGov is an AI-powered transparency platform that monitors Greek public sector contracts for signs of fraud, waste, and financial irregularities. It ingests procurement data from [Diavgeia](https://diavgeia.gov.gr/), runs automated anomaly detection, performs AI-driven auditing via GPT-5.1, and presents the results through an interactive Streamlit dashboard with a RAG chat interface.
 
 Built for **Netcompany Hackathon Thessaloniki 2026** — Challenge 2: AI-Powered Knowledge Base System.
 
@@ -45,7 +45,7 @@ CitizenGov follows a four-stage pipeline architecture:
                                                               +--------------------+
 ```
 
-**Data layer:** ChromaDB vector database stores contract embeddings alongside structured metadata (budget, risk level, municipality, contractor, date). This enables both semantic search and metadata-filtered retrieval through a single store.
+**Data layer:** ChromaDB vector database stores contract embeddings alongside structured metadata (budget, risk level, organization, contractor, date). This enables both semantic search and metadata-filtered retrieval through a single store.
 
 **Compute layer:** A FastAPI backend exposes REST endpoints for contract ingestion. An n8n workflow (or standalone scripts) feeds data into the pipeline. The pipeline evaluates rule-based anomaly flags, then escalates suspicious contracts to GPT-5.1 for deeper analysis.
 
@@ -148,11 +148,13 @@ The Diavgeia API returns decisions with structured metadata. We extract:
 | `id` | `ada` | Unique decision identifier (Αριθμός Διαδικτυακής Ανάρτησης) |
 | `description` | `subject` + `documentText` | Subject line; optionally enriched with full decision text via `/luminapi/api/decisions/{ada}` |
 | `date` | `issueDate` | Unix timestamp (ms from epoch) |
-| `municipality` (ministry) | `organizationId` → lookup | Numeric org ID mapped to label via `ORG_ID_TO_LABEL` dict |
+| `organization` | `organizationId` → lookup | Numeric org ID mapped to ministry label via `ORG_ID_TO_LABEL` dict |
 | `budget` | `extraFieldValues.awardAmount.amount` | Contract award amount; fallback to `amountWithTaxes` / `amountWithVAT` |
 | `contractor` | `extraFieldValues.person[].name` | Company name from the `person` array (Δ.1 decisions); includes AFM (tax ID) |
 
 **Decision text enrichment:** When `--fetch-text` is used, the fetcher calls `/luminapi/api/decisions/{ada}` for each decision to retrieve the `documentText` field — the plain-text body of the actual decision document. This is appended to the description (first 500 chars) to provide richer context for the AI auditor and RAG search. This adds ~0.2s per decision due to the extra API call.
+
+> **Known limitation:** In practice, most Diavgeia decisions (especially Δ.1 contracts) are uploaded as signed PDF attachments only. The `documentText` field is empty for these decisions, so `--fetch-text` returns no additional text. The `subject` field remains the primary source of description content. Extracting text from the PDF attachments (`documentUrl`) would require downloading and OCR-ing each file, which is outside the scope of this project.
 
 **Organization ID resolution:** The API returns `organizationId` as a numeric string (e.g., `"6114"`), not a human-readable name. We maintain a static mapping (`ORG_ID_TO_LABEL`) from organization UIDs to Greek labels, derived from the `/organizations/{uid}` endpoint.
 
@@ -168,28 +170,28 @@ The Diavgeia API enforces a **180-day window** on `issueDate` queries and caps p
 
 Contracts enter the system in one of three ways:
 - **n8n workflow** — An automated flow queries Diavgeia's advanced search API, then POSTs each contract to the FastAPI `/api/ingest` endpoint.
-- **Standalone script** — `scripts/fetch_diavgeia.py` replicates the n8n logic in pure Python with pagination support (up to 10,000+ contracts), useful for bulk ingestion without n8n. Supports `--from-cache` to skip re-fetching and re-auditing.
-- **Mock data** — `scripts/ingest.py` loads 10 pre-built contracts from `data/sample_contracts.json` for offline testing.
+- **Standalone script** — `scripts/fetch_diavgeia.py` replicates the n8n logic in pure Python, useful for bulk ingestion without n8n. Supports `--from-cache` to skip re-fetching and re-auditing.
+- **Mock data** — `scripts/ingest.py` loads 10 pre-built contracts from `data/sample_contracts.json` for offline dummy testing.
 
-Each contract is normalized into a standard dict with: `id`, `contractor`, `budget`, `date`, `description`, and `municipality`.
+Each contract is normalized into a standard dict with: `id`, `contractor`, `budget`, `date`, `description`, and `organization`.
 
 ### Stage 2: Rule-Based Anomaly Detection (`app/watchdog/rules.py`)
 
 The rule engine computes average budgets per procurement category, then flags any contract whose budget exceeds **3x the category average** AND is above **EUR 10,000** (to filter out noise from small purchases).
 
-Flagged contracts receive `risk_level: "Medium"` and a descriptive `risk_summary` explaining why they were flagged. In our dataset of ~10,000 real Diavgeia decisions, the rule engine flags approximately **1.6%** of contracts for AI review — a realistic anomaly rate.
+Flagged contracts receive `risk_level: "Medium"` and a descriptive `risk_summary` explaining why they were flagged. In our dataset of ~3.500 real Diavgeia decisions, the rule engine flags approximately **1.6%** of contracts for AI review — a realistic anomaly rate.
 
 **Small batch handling:** When contracts arrive one at a time (via n8n webhooks), computing a meaningful average is impossible. The system falls back to hardcoded `BASELINE_AVERAGES` derived from historical procurement data when the batch size is less than 5.
 
 ### Stage 3: AI Auditing (`app/watchdog/agent.py`)
 
-Contracts flagged as "Medium" risk are escalated to GPT-5.1 (via OpenAI API) for deeper analysis. The agent:
+Contracts flagged as "Medium" risk are escalated to GPT-5.1 for deeper analysis. The agent:
 
 1. Receives a few-shot prompt (`app/prompts/templates.py`) designed to enforce strict JSON output at low temperature (0.1).
 2. Returns a structured risk assessment with `risk_level` (Low/Medium/High) and `risk_summary`.
 3. The response is validated through a Pydantic parser (`app/prompts/parser.py`) that strips markdown artifacts, extracts JSON, and validates the schema. On validation failure, it automatically retries up to 3 times, feeding the error details back to the LLM.
 
-**LLM Provider:** The system supports Azure OpenAI (primary, for GPT-5.1), direct OpenAI, and OpenRouter (fallback, for free models). Set `LLM_PROVIDER=azure`, `openai`, or `openrouter` in `.env`.
+**LLM Provider:** The system supports OpenAI (primary, for GPT-5.1) and OpenRouter (fallback, for free models). Set `LLM_PROVIDER=openai` or `openrouter` in `.env`.
 
 **Demo mode:** If no API key is set for either provider, the agent returns simulated "High risk" responses so the dashboard can be demonstrated without API costs.
 
@@ -201,7 +203,7 @@ Each contract's text is embedded using the `all-MiniLM-L6-v2` sentence-transform
 
 This enables:
 - **Semantic search** — The chat interface finds relevant contracts by meaning, not just keywords.
-- **Metadata-filtered search** — Hybrid retrieval combines semantic similarity with structured filters (municipality, category, risk level, budget range).
+- **Metadata-filtered search** — Hybrid retrieval combines semantic similarity with structured filters (organization, category, risk level, budget range).
 - **Watchdog visualization** — The Watchdog Map retrieves all contracts and renders risk-level-based visualizations.
 
 ---
@@ -214,10 +216,10 @@ The Chat-to-Chart interface implements a **Hybrid RAG** (Retrieval-Augmented Gen
 User Query: "Which Thessaloniki contracts have the highest risk?"
          |
          v
-  [1. Query Analyzer]   → Extracts: municipality="Thessaloniki", risk_level="High"
+  [1. Query Analyzer]   → Extracts: organization="Thessaloniki", risk_level="High"
          |                          semantic_query="contracts highest risk"
          v
-  [2. Hybrid Retriever]  → ChromaDB where_filter={municipality, risk_level}
+  [2. Hybrid Retriever]  → ChromaDB where_filter={organization, risk_level}
          |                  + semantic search on remaining text (20 candidates)
          v
   [3. Re-ranker]          → Scores by: similarity + budget relevance + risk relevance
@@ -242,7 +244,7 @@ Extracts structured filters from natural language without any LLM calls (zero la
 ### 2. Hybrid Retriever (`embeddings.py → hybrid_search()`)
 
 Combines ChromaDB metadata `where` filters with semantic search. For example, "decisions from the Ministry of Interior over €100K" becomes:
-- `where`: `{"$and": [{"municipality": {"$contains": "Εσωτερικών"}}, {"budget": {"$gte": 100000}}]}`
+- `where`: `{"$and": [{"organization": {"$contains": "Εσωτερικών"}}, {"budget": {"$gte": 100000}}]}`
 - Plus semantic search on the remaining query text
 
 Falls back to pure semantic search if filters return no results.
@@ -281,7 +283,7 @@ The RAG system prompt instructs GPT-5.1 to:
 2. Query Analyzer extracts structured filters + semantic query.
 3. Hybrid search retrieves and re-ranks the most relevant contracts.
 4. GPT-5.1 generates a grounded, citation-backed answer.
-5. A Plotly pie chart is dynamically rendered showing spending by municipality.
+5. A Plotly pie chart is dynamically rendered showing spending by organization.
 
 **Watchdog_Map.py — Risk Monitoring Dashboard:**
 - Displays KPI cards: total decisions monitored, High risk flags, Medium risk flags.
@@ -325,7 +327,7 @@ pip install -r requirements.txt
 
 ### 4. Configure environment variables
 
-Copy `.env.example` to `.env` and fill in your API keys:
+Create your `.env` and fill in your API keys:
 
 ```powershell
 copy .env.example .env
@@ -334,12 +336,16 @@ copy .env.example .env
 Then edit `.env`:
 
 ```env
-# Primary: Azure OpenAI (for GPT-5.1)
-LLM_PROVIDER=azure
-AZURE_OPENAI_API_KEY=your-azure-api-key-here
-AZURE_OPENAI_ENDPOINT=https://your-resource-name.openai.azure.com
-AZURE_OPENAI_DEPLOYMENT=your-deployment-name
-AZURE_OPENAI_API_VERSION=2024-12-01-preview
+# === LLM Provider ===
+LLM_PROVIDER=openai
+
+# === OpenAI (primary — recommended) ===
+OPENAI_API_KEY=sk-your-openai-key-here
+OPENAI_MODEL=gpt-5.1
+
+# === OpenRouter (free fallback) ===
+# OPENROUTER_API_KEY=sk-or-your-key-here
+# LLM_MODEL=openai/gpt-oss-120b:free
 
 # ChromaDB
 CHROMA_HOST=localhost
@@ -348,14 +354,12 @@ CHROMA_PORT=8000
 
 | Variable | Description | Default |
 |---|---|---|
-| `LLM_PROVIDER` | `"azure"`, `"openai"`, or `"openrouter"`. | `azure` |
-| `AZURE_OPENAI_API_KEY` | Your Azure OpenAI API key. | `""` |
-| `AZURE_OPENAI_ENDPOINT` | Azure resource endpoint URL. | `""` |
-| `AZURE_OPENAI_DEPLOYMENT` | Azure deployment name (e.g., your GPT-5.1 deployment). | `""` |
-| `AZURE_OPENAI_API_VERSION` | Azure API version. | `2024-12-01-preview` |
-| `OPENAI_API_KEY` | Alternative: direct OpenAI API key. | `""` |
-| `OPENROUTER_API_KEY` | Fallback: OpenRouter API key (free models). | `""` |
-| `CHROMA_HOST` | ChromaDB hostname. Use `localhost` for local dev. | `localhost` |
+| `LLM_PROVIDER` | `"openai"` (recommended) or `"openrouter"` (free fallback). | `openai` |
+| `OPENAI_API_KEY` | Your OpenAI API key (for GPT-5.1). | `""` |
+| `OPENAI_MODEL` | OpenAI model name. | `gpt-5.1` |
+| `OPENROUTER_API_KEY` | OpenRouter API key (free models as fallback). | `""` |
+| `LLM_MODEL` | OpenRouter model identifier. | `openai/gpt-oss-120b:free` |
+| `CHROMA_HOST` | ChromaDB hostname. Use `localhost` for local dev, `chromadb` in Docker. | `localhost` |
 | `CHROMA_PORT` | ChromaDB port. | `8000` |
 | `EMBEDDING_MODEL` | Sentence-transformer model for embeddings. | `all-MiniLM-L6-v2` |
 | `ANOMALY_MULTIPLIER` | Budget anomaly threshold multiplier (e.g., 3.0 = 300%). | `3.0` |
@@ -396,6 +400,8 @@ python -m streamlit run app/dashboard/Home.py
 
 The dashboard opens at `http://localhost:8501`. Use the sidebar to navigate between the Chat-to-Chart home page and the Watchdog Map.
 
+> **Note:** The first time Streamlit loads, it downloads and initializes the sentence-transformer embedding model (~90 MB). This causes an expected delay of some minutes.
+
 ---
 
 ## Data Ingestion
@@ -416,7 +422,7 @@ Fetches live **Δ.1 (contract) decisions** from the Diavgeia OpenData advanced s
 # Fetch 14,000 real contracts (2,000 per ministry), audit flagged ones, store in ChromaDB
 python scripts/fetch_diavgeia.py --limit 14000
 
-# Same, but also fetch the full decision text for richer RAG context (~0.2s extra per decision)
+# Same, but also fetch the full decision text for richer RAG context (~0.2s extra per decision). Since Diavgeia's API is not 100% working, during our tests, there was high probability of no text being returned.
 python scripts/fetch_diavgeia.py --limit 14000 --fetch-text
 
 # Re-ingest from cache (skips re-fetching and re-auditing — instant)
@@ -436,7 +442,7 @@ Or POST them to the running FastAPI backend (same as n8n would):
 python scripts/fetch_diavgeia.py --mode api --limit 50
 ```
 
-**Repair script:** If municipality or metadata needs fixing without re-auditing:
+**Repair script:** If organization or metadata needs fixing without re-auditing:
 ```powershell
 python scripts/repair_cache.py --reingest
 ```
@@ -478,11 +484,11 @@ The FastAPI backend runs on port **8001** and exposes the following endpoints:
   "issue_date": "2026-02-18",
   "contractor": "INTRASOFT INTERNATIONAL A.E.",
   "budget": 248000.0,
-  "municipality": "Υπουργείο Ψηφιακής Διακυβέρνησης"
+  "organization": "Υπουργείο Ψηφιακής Διακυβέρνησης"
 }
 ```
 
-`contractor`, `budget`, and `municipality` are optional (default to `"Unknown"`, `0.0`, and `"Unknown"` respectively).
+`contractor`, `budget`, and `organization` are optional (default to `"Unknown"`, `0.0`, and `"Unknown"` respectively).
 
 ---
 
@@ -493,7 +499,7 @@ All configuration is centralized in `app/config.py`, which reads from environmen
 | Setting | Source | Default | Purpose |
 |---|---|---|---|
 | `LLM_PROVIDER` | `LLM_PROVIDER` env var | `openai` | Which LLM backend to use (`openai` or `openrouter`) |
-| `OPENAI_MODEL` | `OPENAI_MODEL` env var | `gpt-5.2` | OpenAI model for auditing and chat |
+| `OPENAI_MODEL` | `OPENAI_MODEL` env var | `gpt-5.1` | OpenAI model for auditing and chat |
 | `DEMO_MODE` | Auto-detected | `True` if no API keys set | Skips LLM calls, returns simulated responses |
 | `ANOMALY_MULTIPLIER` | `ANOMALY_MULTIPLIER` env var | `3.0` | How many times above average triggers a flag |
 | `CHROMA_COLLECTION` | `CHROMA_COLLECTION` env var | `procurement_contracts` | ChromaDB collection name |
@@ -506,11 +512,7 @@ All configuration is centralized in `app/config.py`, which reads from environmen
 
 ### Why Hybrid RAG over naive semantic search?
 
-Our data is **semi-structured**: each contract has structured fields (budget, municipality, category, risk level) alongside unstructured text (description). Pure semantic search fails on queries like "show me IT contracts over €100K in Thessaloniki" because embeddings don't reliably encode numbers, categories, or entity names. Hybrid retrieval — combining ChromaDB metadata `where` filters with semantic search — handles both structured and unstructured queries in a single pass. See `thought.md` for a detailed comparison of RAG approaches.
-
-### Why GPT-5.1?
-
-GPT-5.1 provides the best reasoning quality for both contract auditing (detecting fraud patterns) and RAG chat (synthesizing answers from tabular data). At $1.25/1M input tokens and $10/1M output tokens, auditing 500 flagged contracts costs ~$0.71 and 100 chat queries cost ~$0.29 — well within a $10 budget.
+Our data is **semi-structured**: each contract has structured fields (budget, organization, category, risk level) alongside unstructured text (description). Pure semantic search fails on queries like "show me IT contracts over €100K in Thessaloniki" because embeddings don't reliably encode numbers, categories, or entity names. Hybrid retrieval — combining ChromaDB metadata `where` filters with semantic search — handles both structured and unstructured queries in a single pass. See `thought.md` for a detailed comparison of RAG approaches.
 
 ### Why ChromaDB as a vector database?
 
@@ -518,32 +520,12 @@ ChromaDB provides a lightweight, self-hosted vector store that runs in a single 
 
 ### Why a keyword-based query analyzer instead of an LLM?
 
-The query analyzer uses regex/keyword matching instead of an LLM call. This adds zero latency and zero cost to every chat query. For the structured filters we need (municipality names, category keywords, budget patterns, risk keywords), keyword matching is deterministic and sufficient. Using an LLM to parse queries would add ~1 second latency and ~$0.003 per query for no meaningful accuracy gain on these well-defined patterns.
+The query analyzer uses regex/keyword matching instead of an LLM call. This adds zero latency and zero cost to every chat query. For the structured filters we need (organization names, category keywords, budget patterns, risk keywords), keyword matching is deterministic and sufficient. Using an LLM to parse queries would add ~1 second latency and ~$0.003 per query for no meaningful accuracy gain on these well-defined patterns.
 
 ### Why re-ranking after retrieval?
 
 ChromaDB's L2 distance only measures semantic similarity. But when a user asks about "expensive risky contracts," the most relevant result isn't necessarily the most semantically similar — it's the one that's both semantically relevant AND has high budget AND high risk. Re-ranking with domain-specific boosts (budget relevance, risk relevance) produces better results than pure semantic ranking.
 
-### Why few-shot prompting with Pydantic validation?
-
-The LLM must return structured JSON that maps directly to risk assessments. Few-shot examples in the system prompt train the model on the exact output format, while Pydantic validation (`app/prompts/parser.py`) acts as a safety net. If the LLM produces malformed JSON, the parser feeds the validation error back to the LLM and retries (up to 3 times). This closed-loop approach ensures reliable structured output.
-
-### Why baseline averages for single-contract evaluation?
-
-When n8n sends contracts one at a time, the rule engine can't compute meaningful category averages from a single data point (a contract can never exceed 3x its own budget). Hardcoded baseline averages derived from historical procurement data solve this by providing a reference point for anomaly detection regardless of batch size.
-
-### Why static organization ID mapping instead of live API lookups?
-
-The Diavgeia API returns `organizationId` as a numeric string (e.g., `"6114"`), not a human-readable name. We could call `/organizations/{uid}` for each decision, but that would add 10,000 extra API calls during bulk ingestion. Instead, we maintain a static `ORG_ID_TO_LABEL` dict for the 7 organizations we monitor. This is a conscious trade-off: zero extra latency in exchange for maintaining the mapping manually when adding new organizations.
-
 ### Why sentence-transformers (`all-MiniLM-L6-v2`)?
 
 This model offers an excellent balance of embedding quality and speed. It runs locally (no API calls needed), generates 384-dimensional vectors, and handles both English and Greek text reasonably well. For a hackathon context, it eliminates external embedding API dependencies and associated latency.
-
-### Why FastAPI with background tasks?
-
-Contract processing (rule evaluation + LLM auditing + embedding + ChromaDB storage) can take several seconds per contract, especially when the LLM is involved. By using FastAPI's `BackgroundTasks`, the API returns immediately with a 200 status, allowing n8n to continue sending contracts without waiting. This prevents webhook timeouts and enables parallel processing.
-
-### Why dual LLM providers (OpenAI + OpenRouter)?
-
-OpenAI provides GPT-5.1 for high-quality auditing and chat. OpenRouter provides free fallback models for development and demo mode. Switching between them requires changing a single environment variable (`LLM_PROVIDER`), with no code changes. Both use the OpenAI-compatible chat completions format.

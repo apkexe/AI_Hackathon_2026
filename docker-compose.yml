@@ -16,40 +16,29 @@ services:
       timeout: 5s
       retries: 5
 
-  # The Python app (Streamlit + processing backend)
+  # CitizenGov App (Streamlit Dashboard + FastAPI Backend)
   app:
+    image: ghcr.io/apkexe/citizengov:latest
     build: .
     container_name: citizengov_app
     ports:
-      - "8501:8501"
+      - "8501:8501"   # Streamlit Dashboard
+      - "8001:8000"   # FastAPI API (for n8n webhooks)
     depends_on:
       chromadb:
         condition: service_healthy
     environment:
+      - LLM_PROVIDER=${LLM_PROVIDER:-openai}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - OPENAI_MODEL=${OPENAI_MODEL:-gpt-5.1}
       - OPENROUTER_API_KEY=${OPENROUTER_API_KEY:-}
       - LLM_MODEL=${LLM_MODEL:-}
       - CHROMA_HOST=chromadb
       - CHROMA_PORT=8000
+      - EMBEDDING_MODEL=${EMBEDDING_MODEL:-all-MiniLM-L6-v2}
     networks:
       - citizengov_network
-
-  # The API Backend for n8n Webhooks
-  python-backend:
-    build: .
-    container_name: citizengov_api
-    ports:
-      - "8001:8000"
-    depends_on:
-      chromadb:
-        condition: service_healthy
-    command: uvicorn app.api:app --host 0.0.0.0 --port 8000
-    environment:
-      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY:-}
-      - LLM_MODEL=${LLM_MODEL:-}
-      - CHROMA_HOST=chromadb
-      - CHROMA_PORT=8000
-    networks:
-      - citizengov_network
+    restart: unless-stopped
 
 networks:
   citizengov_network:

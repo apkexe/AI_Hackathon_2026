@@ -19,7 +19,7 @@ class DiavgeiaPayload(BaseModel):
     issue_date: str
     contractor: Optional[str] = "Unknown"
     budget: Optional[float] = 0.0
-    municipality: Optional[str] = "Unknown"
+    organization: Optional[str] = "Unknown"
 
 def process_and_ingest(data: dict):
     logger.info(f"Processing webhook for contract: {data.get('ada')}")
@@ -29,7 +29,7 @@ def process_and_ingest(data: dict):
         "budget": float(data.get("budget") or 0.0),
         "date": data.get("issue_date"),
         "description": data.get("subject", ""),
-        "municipality": data.get("municipality") or "Unknown",
+        "organization": data.get("organization") or "Unknown",
         "category": _infer_category(data.get("subject", ""))
     }
 

@@ -55,15 +55,15 @@ def ask_rag(question: str, vs: VectorStore) -> str:
         relevant_contracts = vs.hybrid_search(
             query=semantic_query,
             where_filters=filters if filters else None,
-            n_results=20,
+            n_results=50,
         )
     except Exception:
-        relevant_contracts = vs.search_contracts(question, n_results=10)
+        relevant_contracts = vs.search_contracts(question, n_results=20)
 
     if not relevant_contracts:
         return "Δεν βρέθηκαν σχετικά αποτελέσματα."
 
-    relevant_contracts = vs.rerank_results(relevant_contracts, question, top_k=10)
+    relevant_contracts = vs.rerank_results(relevant_contracts, question, top_k=15)
     context_text = format_contracts_as_context(relevant_contracts)
     user_prompt = f"Context:\n{context_text}\n\nQuestion: {question}"
 
@@ -81,10 +81,19 @@ def score_answer(question: str, expected: str, actual: str) -> dict:
     raw = call_llm(EVAL_SYSTEM_PROMPT, user_prompt)
 
     import json
+    import re
     try:
+        # Try direct parse first
         result = json.loads(raw.strip())
         return {"score": int(result["score"]), "reasoning": result["reasoning"]}
     except Exception:
+        # Fallback: extract score with regex
+        score_match = re.search(r'"score"\s*:\s*(\d)', raw)
+        reasoning_match = re.search(r'"reasoning"\s*:\s*"([^"]*(?:\\.[^"]*)*)"', raw, re.DOTALL)
+        if score_match:
+            score = int(score_match.group(1))
+            reasoning = reasoning_match.group(1) if reasoning_match else "Parsed via regex fallback"
+            return {"score": score, "reasoning": reasoning}
         logger.warning(f"Failed to parse eval response: {raw}")
         return {"score": 0, "reasoning": f"Parse error: {raw[:200]}"}
 

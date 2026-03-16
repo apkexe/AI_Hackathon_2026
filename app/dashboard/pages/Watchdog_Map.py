@@ -71,7 +71,7 @@ def load_all_data():
         c = result["metadatas"][i].copy()
         c["id"] = doc_id
         doc_text = result["documents"][i] if result["documents"] else ""
-        c["description"] = doc_text.split("Description: ")[-1].split(" Municipality:")[0] if doc_text else ""
+        c["description"] = doc_text.split("Description: ")[-1].split(" Organization:")[0] if doc_text else ""
         contracts.append(c)
     return pd.DataFrame(contracts)
 
@@ -107,7 +107,7 @@ else:
         )
         risk_filter = [RISK_LABEL[r] for r in risk_filter_gr]
     with filter_col2:
-        ministry_options = sorted(df['municipality'].unique()) if 'municipality' in df.columns else []
+        ministry_options = sorted(df['organization'].unique()) if 'organization' in df.columns else []
         ministry_filter = st.multiselect(
             "Υπουργείο",
             options=ministry_options,
@@ -118,13 +118,13 @@ else:
     filtered_df = df.copy()
     if risk_filter:
         filtered_df = filtered_df[filtered_df['risk_level'].isin(risk_filter)]
-    if ministry_filter and 'municipality' in filtered_df.columns:
-        filtered_df = filtered_df[filtered_df['municipality'].isin(ministry_filter)]
+    if ministry_filter and 'organization' in filtered_df.columns:
+        filtered_df = filtered_df[filtered_df['organization'].isin(ministry_filter)]
 
     st.markdown(f"### Αποτελέσματα Ελέγχου ({len(filtered_df):,} αποφάσεις)")
 
     # Ensure columns exist
-    expected_cols = ['id', 'contractor', 'budget', 'municipality', 'risk_level', 'risk_summary', 'date']
+    expected_cols = ['id', 'contractor', 'budget', 'organization', 'risk_level', 'risk_summary', 'date']
     for col in expected_cols:
         if col not in filtered_df.columns:
             if col == 'risk_level':
@@ -132,12 +132,12 @@ else:
             else:
                 filtered_df[col] = ''
 
-    display_df = filtered_df[['contractor', 'budget', 'municipality', 'risk_level', 'risk_summary', 'date']].copy()
+    display_df = filtered_df[['contractor', 'budget', 'organization', 'risk_level', 'risk_summary', 'date']].copy()
     display_df['risk_level'] = display_df['risk_level'].map(RISK_LABEL_REV).fillna(display_df['risk_level'])
     display_df = display_df.rename(columns={
         'contractor': 'Ανάδοχος',
         'budget': 'Προϋπολογισμός',
-        'municipality': 'Υπουργείο',
+        'organization': 'Υπουργείο',
         'risk_level': 'Κίνδυνος',
         'risk_summary': 'Αιτιολόγηση',
         'date': 'Ημερομηνία',
@@ -176,12 +176,12 @@ else:
             anomaly_df = chart_df[chart_df['risk_level'].isin(['High', 'Medium'])]
             fig_bar = px.bar(
                 anomaly_df,
-                x='municipality',
+                x='organization',
                 y='budget',
                 color='risk_gr',
                 hover_data=['contractor'],
                 color_discrete_map=gov_colors,
-                labels={'municipality': 'Υπουργείο', 'budget': 'Ποσό (€)', 'risk_gr': 'Κίνδυνος'},
+                labels={'organization': 'Υπουργείο', 'budget': 'Ποσό (€)', 'risk_gr': 'Κίνδυνος'},
             )
             fig_bar.update_layout(
                 plot_bgcolor='white',

@@ -72,7 +72,7 @@ def fetch_contracts(use_mock_data: bool = True) -> List[Dict[str, Any]]:
                     "budget": float(budget or 0),
                     "date": doc.get("issueDate", ""),
                     "description": (doc.get("subject") or "").replace("\n", " "),
-                    "municipality": (doc.get("organizationLabel") or "Unknown").replace("\n", " "),
+                    "organization": (doc.get("organizationLabel") or "Unknown").replace("\n", " "),
                     "category": _infer_category(doc.get("subject", ""))
                 }
                 contracts.append(contract)

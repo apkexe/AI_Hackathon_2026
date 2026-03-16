@@ -22,7 +22,7 @@ class VectorStore:
             self.client = chromadb.EphemeralClient()
 
         self.collection = self.client.get_or_create_collection(name=CHROMA_COLLECTION)
-        
+
         logger.info(f"Loading embedding model: {EMBEDDING_MODEL}")
         self.encoder = SentenceTransformer(EMBEDDING_MODEL)
 
@@ -48,14 +48,14 @@ class VectorStore:
         ids = []
 
         for c in contracts:
-            text_to_embed = f"Contractor: {c['contractor']}. Description: {c['description']} Municipality: {c['municipality']}."
+            text_to_embed = f"Contractor: {c.get('contractor', '')}. Description: {c.get('description', '')} Organization: {c.get('organization', '')}."
             documents.append(text_to_embed)
 
             metadatas.append({
                 "contractor": c.get("contractor", ""),
                 "budget": float(c.get("budget", 0)),
                 "date": c.get("date", ""),
-                "municipality": c.get("municipality", ""),
+                "organization": c.get("organization", ""),
                 "category": c.get("category", ""),
                 "risk_level": c.get("risk_level", "Low"),
                 "risk_summary": c.get("risk_summary", "")
@@ -82,88 +82,115 @@ class VectorStore:
 
         logger.info("Ingestion complete.")
 
-    def search_contracts(self, query: str, n_results: int = 5) -> List[Dict[str, Any]]:
+    def _build_where(self, filters: dict) -> dict:
+        """Build a ChromaDB where clause from filter dict.
+        ChromaDB supports: $eq, $ne, $gt, $gte, $lt, $lte, $in, $nin for metadata.
+        No $contains — use $eq for exact string match.
         """
-        Performs semantic search to find relevant contracts.
-        """
-        query_embedding = self.encoder.encode([query]).tolist()
-        
-        results = self.collection.query(
-            query_embeddings=query_embedding,
-            n_results=n_results
-        )
-        
-        # Reconstruct exactly as original dicts for easy use
-        contracts = []
-        for i in range(len(results['ids'][0])):
-            c = results['metadatas'][0][i].copy()
-            c['id'] = results['ids'][0][i]
-            c['description'] = results['documents'][0][i].split("Description: ")[-1].split(" Municipality:")[0]
-            contracts.append(c)
-            
-        return contracts
+        clauses = []
+        for key, value in filters.items():
+            if key == "organization":
+                # Full canonical name (e.g. "Υπουργείο Ψηφιακής Διακυβέρνησης")
+                clauses.append({"organization": {"$eq": value}})
+            elif key == "category":
+                clauses.append({"category": {"$eq": value}})
+            elif key == "risk_level":
+                clauses.append({"risk_level": {"$eq": value}})
+            elif key == "budget_min":
+                clauses.append({"budget": {"$gte": float(value)}})
+            elif key == "budget_max":
+                clauses.append({"budget": {"$lte": float(value)}})
 
-    def hybrid_search(self, query: str, where_filters: dict = None, n_results: int = 20) -> List[Dict[str, Any]]:
-        """
-        Performs semantic search with optional ChromaDB metadata filters.
-        Falls back to pure semantic search if filters cause an error.
-        """
-        query_embedding = self.encoder.encode([query]).tolist()
+        if len(clauses) == 0:
+            return None
+        elif len(clauses) == 1:
+            return clauses[0]
+        else:
+            return {"$and": clauses}
 
-        # Build ChromaDB where clause from filters
-        where = None
-        if where_filters:
-            clauses = []
-            for key, value in where_filters.items():
-                if key == "municipality":
-                    clauses.append({"municipality": {"$contains": value}})
-                elif key == "category":
-                    clauses.append({"category": value})
-                elif key == "risk_level":
-                    clauses.append({"risk_level": value})
-                elif key == "budget_min":
-                    clauses.append({"budget": {"$gte": float(value)}})
-                elif key == "budget_max":
-                    clauses.append({"budget": {"$lte": float(value)}})
-
-            if len(clauses) == 1:
-                where = clauses[0]
-            elif len(clauses) > 1:
-                where = {"$and": clauses}
-
+    def _query_chromadb(self, query_embedding, where, n_results):
+        """Run a ChromaDB query, return results or None on failure."""
+        kwargs = {"query_embeddings": query_embedding, "n_results": n_results}
+        if where:
+            kwargs["where"] = where
         try:
-            kwargs = {
-                "query_embeddings": query_embedding,
-                "n_results": n_results,
-            }
-            if where:
-                kwargs["where"] = where
-
             results = self.collection.query(**kwargs)
+            if results and results.get("ids") and results["ids"][0]:
+                return results
         except Exception as e:
-            logger.warning(f"Filtered search failed ({e}), falling back to pure semantic search.")
-            results = self.collection.query(
-                query_embeddings=query_embedding,
-                n_results=n_results,
-            )
+            logger.warning(f"ChromaDB query failed with where={where}: {e}")
+        return None
 
-        # Handle empty results
-        if not results or not results.get("ids") or not results["ids"][0]:
-            return []
-
+    def _parse_results(self, results) -> List[Dict[str, Any]]:
+        """Parse ChromaDB results into contract dicts."""
         contracts = []
         for i in range(len(results["ids"][0])):
             c = results["metadatas"][0][i].copy()
             c["id"] = results["ids"][0][i]
-            c["description"] = results["documents"][0][i].split("Description: ")[-1].split(" Municipality:")[0]
-            # Store distance for re-ranking
+            doc = results["documents"][0][i] if results.get("documents") and results["documents"][0] else ""
+            c["description"] = doc.split("Description: ")[-1].split(" Organization:")[0] if doc else ""
             if results.get("distances") and results["distances"][0]:
                 c["_distance"] = results["distances"][0][i]
             contracts.append(c)
-
         return contracts
 
-    def rerank_results(self, results: List[Dict], query: str, top_k: int = 10) -> List[Dict]:
+    def search_contracts(self, query: str, n_results: int = 5) -> List[Dict[str, Any]]:
+        """Performs semantic search to find relevant contracts."""
+        query_embedding = self.encoder.encode([query]).tolist()
+        results = self.collection.query(query_embeddings=query_embedding, n_results=n_results)
+        if not results or not results.get("ids") or not results["ids"][0]:
+            return []
+        return self._parse_results(results)
+
+    def hybrid_search(self, query: str, where_filters: dict = None, n_results: int = 50) -> List[Dict[str, Any]]:
+        """
+        Performs semantic search with optional ChromaDB metadata filters.
+        Uses progressive fallback: tries all filters first, then loosens progressively.
+        """
+        query_embedding = self.encoder.encode([query]).tolist()
+
+        if not where_filters:
+            # No filters — pure semantic search
+            results = self._query_chromadb(query_embedding, None, n_results)
+            if results:
+                logger.info(f"Pure semantic search returned {len(results['ids'][0])} results.")
+                return self._parse_results(results)
+            return []
+
+        # Strategy 1: Try all filters combined
+        where = self._build_where(where_filters)
+        logger.info(f"Hybrid search with filters: {where_filters} → where={where}")
+        results = self._query_chromadb(query_embedding, where, n_results)
+        if results:
+            count = len(results["ids"][0])
+            logger.info(f"All filters matched: {count} results.")
+            return self._parse_results(results)
+
+        # Strategy 2: Try each filter individually and merge results
+        logger.info("All filters returned 0 results. Trying individual filters...")
+        all_contracts = {}
+        for key in where_filters:
+            single_where = self._build_where({key: where_filters[key]})
+            results = self._query_chromadb(query_embedding, single_where, n_results)
+            if results:
+                for c in self._parse_results(results):
+                    all_contracts[c["id"]] = c
+                logger.info(f"  Filter '{key}={where_filters[key]}' returned {len(results['ids'][0])} results.")
+            else:
+                logger.info(f"  Filter '{key}={where_filters[key]}' returned 0 results.")
+
+        if all_contracts:
+            logger.info(f"Individual filters produced {len(all_contracts)} unique results.")
+            return list(all_contracts.values())
+
+        # Strategy 3: Pure semantic fallback
+        logger.warning("All filters failed. Falling back to pure semantic search.")
+        results = self._query_chromadb(query_embedding, None, n_results)
+        if results:
+            return self._parse_results(results)
+        return []
+
+    def rerank_results(self, results: List[Dict], query: str, top_k: int = 15) -> List[Dict]:
         """
         Re-ranks search results by combining semantic similarity, budget relevance,
         and risk relevance.
@@ -171,14 +198,19 @@ class VectorStore:
         if not results:
             return []
 
-        query_lower = query.lower()
+        import unicodedata
+        def _strip(t):
+            return ''.join(c for c in unicodedata.normalize('NFKD', t) if not unicodedata.combining(c))
+        query_lower = _strip(query.lower())
         mentions_money = any(kw in query_lower for kw in [
-            "budget", "cost", "expensive", "spend", "money", "euro", "\u20ac",
-            "million", "thousand", "\u03c0\u03c1\u03bf\u03cb\u03c0\u03bf\u03bb\u03bf\u03b3\u03b9\u03c3\u03bc",
+            "budget", "cost", "expensive", "spend", "money", "euro", "€",
+            "million", "thousand", "προϋπολογισμ", "δαπάν", "κόστ", "ακριβ",
+            "ποσό", "ποσα", "εκατομμύρ", "χιλιάδ",
         ])
         mentions_risk = any(kw in query_lower for kw in [
             "risk", "fraud", "suspicious", "flagged", "anomal", "danger",
-            "\u03ba\u03af\u03bd\u03b4\u03c5\u03bd", "\u03cd\u03c0\u03bf\u03c0\u03c4",
+            "κίνδυν", "ρίσκ", "ύποπτ", "υποπτ", "επικίνδυν", "απάτ", "παράνομ",
+            "παρατυπ", "επισημαν", "προβλημ", "ανωμαλ", "υψηλ",
         ])
 
         scored = []
@@ -191,7 +223,6 @@ class VectorStore:
             budget_boost = 0.0
             if mentions_money:
                 budget = float(c.get("budget", 0))
-                # Boost high-budget contracts when query is about money
                 if budget >= 500_000:
                     budget_boost = 0.2
                 elif budget >= 100_000:
@@ -201,14 +232,13 @@ class VectorStore:
             if mentions_risk:
                 risk = c.get("risk_level", "Low")
                 if risk == "High":
-                    risk_boost = 0.25
+                    risk_boost = 0.3
                 elif risk == "Medium":
-                    risk_boost = 0.1
+                    risk_boost = 0.15
 
             total_score = similarity_score + budget_boost + risk_boost
             scored.append((total_score, c))
 
-        # Sort descending by score
         scored.sort(key=lambda x: x[0], reverse=True)
 
         # Remove internal _distance key and return top_k
@@ -222,11 +252,11 @@ class VectorStore:
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
     from app.data_ingestion.scraper import fetch_contracts
-    
+
     contracts = fetch_contracts(use_mock_data=True)
     vs = VectorStore()
     vs.ingest_contracts(contracts)
-    
+
     print("\n--- Testing Search ---")
     res = vs.search_contracts("computer repairs", n_results=2)
     for r in res:

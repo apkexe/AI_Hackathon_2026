@@ -1,5 +1,5 @@
 """
-Repair script: re-fetches contract metadata from Diavgeia to fix municipality
+Repair script: re-fetches contract metadata from Diavgeia to fix organization
 and category fields, then merges with existing AI audit results from cache.
 Does NOT re-run the expensive LLM audits.
 
@@ -102,16 +102,16 @@ def main():
     ada_to_org = fetch_ada_to_org_mapping(limit=len(contracts))
     logger.info(f"Built mapping for {len(ada_to_org)} ADAs.")
 
-    # Step 2: Fix municipality and re-categorize
+    # Step 2: Fix organization and re-categorize
     fixed_muni = 0
     fixed_cat = 0
     for c in contracts:
         ada = c.get("id", "")
         org_id = ada_to_org.get(ada, "")
         if org_id and org_id in ORG_ID_TO_LABEL:
-            old_muni = c.get("municipality", "Unknown")
-            c["municipality"] = ORG_ID_TO_LABEL[org_id]
-            if old_muni != c["municipality"]:
+            old_muni = c.get("organization", "Unknown")
+            c["organization"] = ORG_ID_TO_LABEL[org_id]
+            if old_muni != c["organization"]:
                 fixed_muni += 1
 
         old_cat = c.get("category", "")
@@ -138,7 +138,7 @@ def main():
     # Print summary
     from collections import Counter
     risks = Counter(c.get("risk_level", "Low") for c in contracts)
-    munis = Counter(c.get("municipality", "Unknown") for c in contracts)
+    munis = Counter(c.get("organization", "Unknown") for c in contracts)
     cats = Counter(c.get("category", "?") for c in contracts)
     logger.info(f"Risk distribution: {dict(risks)}")
     logger.info(f"Municipality distribution: {dict(munis)}")

@@ -86,7 +86,7 @@ def _parse_decisions(decisions, fetch_text=False):
 
         # Resolve organization label from ID mapping
         org_id = str(decision.get("organizationId", ""))
-        municipality = ORG_ID_TO_LABEL.get(org_id, decision.get("organizationLabel") or "Unknown")
+        org_label = ORG_ID_TO_LABEL.get(org_id, decision.get("organizationLabel") or "Unknown")
 
         ada = decision.get("ada", "")
 
@@ -104,7 +104,7 @@ def _parse_decisions(decisions, fetch_text=False):
             "budget": float(budget or 0),
             "date": decision.get("issueDate", ""),
             "description": f"{subject} | {decision_text[:500]}" if decision_text else subject,
-            "municipality": municipality,
+            "organization": org_label,
             "category": _infer_category(subject),
         }
         contracts.append(contract)
@@ -212,7 +212,7 @@ def ingest_via_api(contracts):
             "issue_date": c["date"],
             "contractor": c["contractor"],
             "budget": c["budget"],
-            "municipality": c["municipality"]
+            "organization": c["organization"]
         }
         try:
             resp = requests.post(BACKEND_URL, json=payload, timeout=10)
